@@ -656,9 +656,7 @@ async function getMatchContext(query) {
 `;
 
   if (fixtures.length) {
-    ctx += '
-[MATCHS] DERNIERS MATCHS :
-';
+ctx += '\n[MATCHS] DERNIERS MATCHS :\n';
     fixtures.slice(0, 5).forEach(f => {
       const home = f.teams?.home?.name;
       const away = f.teams?.away?.name;
