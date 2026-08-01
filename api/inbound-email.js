@@ -65,6 +65,23 @@ async function callClaude(system, userText) {
   return data.content?.[0]?.text || '';
 }
 
+function decodeHtml(html, htmlFormat) {
+  if (htmlFormat === 'data_uri' && html.startsWith('data:')) {
+    const base64 = html.split(',')[1];
+    return base64 ? Buffer.from(base64, 'base64').toString('utf8') : '';
+  }
+  return html;
+}
+
+function extractBody(content) {
+  if (content.text) return content.text.trim();
+  if (content.html) {
+    const html = decodeHtml(content.html, content.html_format);
+    return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+  return '';
+}
+
 function parseFromHeader(from) {
   const match = from.match(/^(.*?)\s*<(.+)>$/);
   if (match) return { name: match[1].trim().replace(/^"|"$/g, ''), email: match[2].trim() };
@@ -93,7 +110,11 @@ export default async function handler(req, res) {
       headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}` }
     });
     const content = await contentRes.json();
-    const body = content.text || content.html?.replace(/<[^>]+>/g, ' ').trim() || '';
+    console.log('inbound content status:', contentRes.status, 'keys:', Object.keys(content),
+      'text_len:', content.text?.length, 'html_len:', content.html?.length, 'html_format:', content.html_format);
+
+    const body = extractBody(content);
+    console.log('extracted body length:', body.length, 'preview:', body.slice(0, 200));
 
     const [org] = await sb(`organizations?slug=eq.${encodeURIComponent(slug)}&select=id,name`);
     if (!org) {
