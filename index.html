@@ -41,6 +41,10 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
 .login-error { margin-top: 12px; padding: 8px 12px; background: rgba(255,77,77,0.1); border: 0.5px solid rgba(255,77,77,0.3); border-radius: 6px; font-size: 12px; color: var(--danger); font-family: var(--mono); }
 
+/* SET PASSWORD */
+#setpw-screen { min-height: 100vh; display: none; align-items: center; justify-content: center; background: var(--bg); }
+#setpw-screen .setpw-account { font-size: 11px; color: var(--text2); font-family: var(--mono); margin: -12px 0 16px; }
+
 /* APP */
 #app { display: none; height: 100vh; flex-direction: column; }
 #app.visible { display: flex; }
@@ -205,6 +209,22 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
     <div class="field"><label>MOT DE PASSE</label><input type="password" id="login-password" placeholder="••••••••" onkeydown="if(event.key==='Enter') doLogin()" /></div>
     <button class="btn-primary" id="login-btn" onclick="doLogin()">ACCÉDER →</button>
     <div id="login-error" class="login-error hidden"></div>
+  </div>
+</div>
+
+<!-- SET PASSWORD (post-invitation) -->
+<div id="setpw-screen">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="login-logo-mark"><span></span></div>
+      <div><h1>MAINTAIN</h1><p>AGENT IA MAINTENANCE INDUSTRIELLE</p></div>
+    </div>
+    <h2>BIENVENUE — DÉFINISSEZ VOTRE MOT DE PASSE</h2>
+    <p class="setpw-account">Compte : <span id="setpw-email"></span></p>
+    <div class="field"><label>MOT DE PASSE</label><input type="password" id="setpw-password" placeholder="8 caractères minimum" /></div>
+    <div class="field"><label>CONFIRMER LE MOT DE PASSE</label><input type="password" id="setpw-password2" placeholder="••••••••" onkeydown="if(event.key==='Enter') finishSetPassword()" /></div>
+    <button class="btn-primary" id="setpw-btn" onclick="finishSetPassword()">DÉFINIR ET CONTINUER →</button>
+    <div id="setpw-error" class="login-error hidden"></div>
   </div>
 </div>
 
@@ -392,6 +412,40 @@ async function doLogin() {
 }
 
 async function doLogout() { await sb.auth.signOut(); location.reload(); }
+
+// ── SET PASSWORD (post-invitation) ──
+function showSetPassword(user) {
+  currentUser = user;
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('setpw-screen').style.display = 'flex';
+  document.getElementById('setpw-email').textContent = user.email;
+}
+
+async function finishSetPassword() {
+  const pass = document.getElementById('setpw-password').value;
+  const pass2 = document.getElementById('setpw-password2').value;
+  const btn = document.getElementById('setpw-btn');
+  const err = document.getElementById('setpw-error');
+  err.classList.add('hidden');
+  if (pass.length < 8) {
+    err.textContent = 'Le mot de passe doit faire au moins 8 caractères.';
+    err.classList.remove('hidden'); return;
+  }
+  if (pass !== pass2) {
+    err.textContent = 'Les mots de passe ne correspondent pas.';
+    err.classList.remove('hidden'); return;
+  }
+  btn.disabled = true; btn.textContent = 'ENREGISTREMENT...';
+  const { data, error } = await sb.auth.updateUser({ password: pass });
+  if (error) {
+    err.textContent = 'Erreur : ' + error.message;
+    err.classList.remove('hidden');
+    btn.disabled = false; btn.textContent = 'DÉFINIR ET CONTINUER →';
+    return;
+  }
+  document.getElementById('setpw-screen').style.display = 'none';
+  await initApp(data.user);
+}
 
 // ── INIT ──
 async function initApp(user) {
@@ -1032,6 +1086,8 @@ async function inviteUser() {
         await sb.from('profiles').insert({ id: session.user.id, org_id: orgId, role, full_name: name });
       }
       window.history.replaceState({}, '', window.location.pathname);
+      showSetPassword(session.user);
+      return;
     }
     await initApp(session.user);
   }
