@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Essayer WRZ Ops gratuitement</title>
+<meta name="description" content="Créez votre organisation d'essai WRZ Ops en 30 secondes.">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0b0d10">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0b0d10; --bg2: #12151c; --bg3: #1a1e28;
+  --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.13);
+  --accent: #00e0a0; --text: #dde1ee; --text2: #7a8099; --text3: #3d4257; --danger: #ff4d4d;
+  --mono: 'DM Mono', monospace; --sans: 'Syne', system-ui, sans-serif;
+}
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); }
+body { display: flex; align-items: center; justify-content: center; padding: 20px; }
+.box { width: 420px; max-width: 100%; background: var(--bg2); border: 0.5px solid var(--border2); border-radius: 16px; padding: 40px 36px; }
+.logo { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; }
+.logo-mark { width: 36px; height: 36px; border-radius: 8px; background: rgba(0,224,160,0.1); border: 0.5px solid rgba(0,224,160,0.3); display: flex; align-items: center; justify-content: center; }
+.logo-mark span { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); display: block; }
+.logo h1 { font-size: 18px; font-weight: 700; letter-spacing: 0.12em; }
+.logo p { font-size: 10px; color: var(--text2); font-family: var(--mono); margin-top: 1px; }
+h2 { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+.sub { font-size: 12.5px; color: var(--text2); margin-bottom: 22px; line-height: 1.5; }
+.field { margin-bottom: 14px; }
+.field label { display: block; font-family: var(--mono); font-size: 10px; color: var(--text2); margin-bottom: 5px; letter-spacing: 0.08em; }
+.field input { width: 100%; background: var(--bg3); border: 0.5px solid var(--border2); border-radius: 8px; color: var(--text); font-size: 13px; font-family: var(--mono); padding: 10px 12px; transition: border-color 0.2s; }
+.field input:focus { outline: none; border-color: var(--accent); }
+.field input::placeholder { color: var(--text3); }
+.btn-primary { width: 100%; background: var(--accent); color: #000; border: none; border-radius: 8px; padding: 11px; font-family: var(--mono); font-size: 12px; font-weight: 500; letter-spacing: 0.1em; cursor: pointer; margin-top: 6px; transition: opacity 0.2s; }
+.btn-primary:hover { opacity: 0.85; }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.msg { margin-top: 12px; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-family: var(--mono); display: none; }
+.msg.error { display: block; background: rgba(255,77,77,0.1); border: 0.5px solid rgba(255,77,77,0.3); color: var(--danger); }
+.msg.ok { display: block; background: rgba(0,224,160,0.1); border: 0.5px solid rgba(0,224,160,0.3); color: var(--accent); }
+.trust { margin-top: 20px; font-family: var(--mono); font-size: 10.5px; color: var(--text3); text-align: center; }
+.success { text-align: center; }
+.success .icon { font-size: 40px; margin-bottom: 14px; }
+.success h2 { margin-bottom: 10px; }
+.success p { font-size: 13px; color: var(--text2); line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<div class="box">
+  <div class="logo">
+    <div class="logo-mark"><span></span></div>
+    <div><h1>WRZ OPS</h1><p>AGENT IA POUR VOS OPÉRATIONS</p></div>
+  </div>
+
+  <div id="form-view">
+    <h2>Essayez gratuitement</h2>
+    <p class="sub">Créez votre organisation d'essai en 30 secondes. Un agent IA de démarrage est prêt dès la connexion — chargez vos documents pour qu'il réponde sur votre activité.</p>
+    <div class="field"><label>VOTRE NOM</label><input type="text" id="su-name" placeholder="Jean Dupont" /></div>
+    <div class="field"><label>EMAIL PROFESSIONNEL</label><input type="email" id="su-email" placeholder="vous@entreprise.com" /></div>
+    <div class="field"><label>NOM DE VOTRE ENTREPRISE</label><input type="text" id="su-company" placeholder="Mon Entreprise" onkeydown="if(event.key==='Enter') startTrial()" /></div>
+    <button class="btn-primary" id="su-btn" onclick="startTrial()">CRÉER MON ESSAI GRATUIT →</button>
+    <div id="su-msg" class="msg"></div>
+    <div class="trust">Aucune carte bancaire requise</div>
+  </div>
+
+  <div id="success-view" class="success" style="display:none">
+    <div class="icon">✦</div>
+    <h2>Vérifiez votre boîte mail</h2>
+    <p>On vient de vous envoyer un lien de connexion. Cliquez dessus pour accéder à votre organisation d'essai — votre agent IA de démarrage sera déjà configuré.</p>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://cjlizuuaxucbpqykregv.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_V-liQ8IOYnAFOLFXwDuDTw_EMprVMq1';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+async function startTrial() {
+  const name = document.getElementById('su-name').value.trim();
+  const email = document.getElementById('su-email').value.trim();
+  const company = document.getElementById('su-company').value.trim();
+  const btn = document.getElementById('su-btn');
+  const msg = document.getElementById('su-msg');
+  msg.className = 'msg';
+
+  if (!name || !email || !company) {
+    msg.textContent = 'Merci de remplir les trois champs.';
+    msg.className = 'msg error';
+    return;
+  }
+
+  btn.disabled = true; btn.textContent = 'CRÉATION EN COURS...';
+
+  try {
+    const res = await fetch('/api/signup-trial', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, fullName: name, companyName: company })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Échec de la création");
+
+    const { error } = await sb.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: window.location.origin + `/?invited=true&org=${data.orgId}&role=admin&name=${encodeURIComponent(name)}`,
+        shouldCreateUser: true
+      }
+    });
+    if (error) throw error;
+
+    document.getElementById('form-view').style.display = 'none';
+    document.getElementById('success-view').style.display = 'block';
+  } catch (e) {
+    msg.textContent = 'Erreur : ' + e.message;
+    msg.className = 'msg error';
+    btn.disabled = false; btn.textContent = 'CRÉER MON ESSAI GRATUIT →';
+  }
+}
+</script>
+</body>
+</html>
