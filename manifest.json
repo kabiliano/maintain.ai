@@ -1,7 +1,7 @@
 {
-  "name": "WRZ Ops — Agent IA Maintenance",
+  "name": "WRZ Ops — Agents IA pour vos opérations",
   "short_name": "WRZ Ops",
-  "description": "Agent IA de maintenance industrielle",
+  "description": "Agents IA pour les opérations d'entreprise",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0b0d10",

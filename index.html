@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>WRZ Ops - Agent IA Maintenance</title>
+<title>WRZ Ops - Agents IA pour vos opérations</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16.png">
@@ -208,7 +208,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   <div class="login-box">
     <div class="login-logo">
       <div class="login-logo-mark"><span></span></div>
-      <div><h1>WRZ OPS</h1><p>AGENT IA MAINTENANCE INDUSTRIELLE</p></div>
+      <div><h1>WRZ OPS</h1><p>AGENTS IA POUR VOS OPÉRATIONS</p></div>
     </div>
     <h2>CONNEXION</h2>
     <div class="field"><label>EMAIL</label><input type="email" id="login-email" placeholder="votre@email.com" /></div>
@@ -223,7 +223,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   <div class="login-box">
     <div class="login-logo">
       <div class="login-logo-mark"><span></span></div>
-      <div><h1>WRZ OPS</h1><p>AGENT IA MAINTENANCE INDUSTRIELLE</p></div>
+      <div><h1>WRZ OPS</h1><p>AGENTS IA POUR VOS OPÉRATIONS</p></div>
     </div>
     <h2>BIENVENUE — DÉFINISSEZ VOTRE MOT DE PASSE</h2>
     <p class="setpw-account">Compte : <span id="setpw-email"></span></p>
@@ -304,18 +304,18 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
         <div class="chat-messages" id="chat-messages">
           <div class="chat-empty" id="chat-empty">
             <div style="font-size:28px;margin-bottom:12px;opacity:0.3">*</div>
-            <h3>Agent Maintenance IA</h3>
-            <p>Posez une question sur vos équipements</p>
+            <h3>Assistant IA Opérations</h3>
+            <p>Posez une question sur vos opérations</p>
             <div class="suggestions">
-              <div class="suggestion" onclick="askSuggestion(this)">Procédure arrêt d'urgence compresseur</div>
-              <div class="suggestion" onclick="askSuggestion(this)">Causes d'une surchauffe moteur</div>
-              <div class="suggestion" onclick="askSuggestion(this)">Intervalles maintenance préventive</div>
-              <div class="suggestion" onclick="askSuggestion(this)">Diagnostic vibration anormale</div>
+              <div class="suggestion" onclick="askSuggestion(this)">Résume les points clés de ce dossier</div>
+              <div class="suggestion" onclick="askSuggestion(this)">Aide-moi à rédiger une procédure</div>
+              <div class="suggestion" onclick="askSuggestion(this)">Analyse cette situation et propose un plan d'action</div>
+              <div class="suggestion" onclick="askSuggestion(this)">Quelles sont les priorités à traiter ?</div>
             </div>
           </div>
         </div>
         <div class="chat-input-wrap">
-          <textarea id="chat-input" placeholder="Posez votre question technique..." rows="1"
+          <textarea id="chat-input" placeholder="Posez votre question..." rows="1"
             onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"
             oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
           <button class="send-btn" id="send-btn" onclick="sendChat()">ENVOYER</button>
@@ -608,7 +608,7 @@ async function loadConversations() {
 async function newConversation() {
   currentConvId = null; convMessages = [];
   const area = document.getElementById('chat-messages');
-  area.innerHTML = document.getElementById('chat-empty')?.outerHTML || '<div class="chat-empty" id="chat-empty"><div style="font-size:28px;margin-bottom:12px;opacity:0.3">*</div><h3>Agent Maintenance IA</h3><p>Posez une question sur vos équipements</p></div>';
+  area.innerHTML = document.getElementById('chat-empty')?.outerHTML || '<div class="chat-empty" id="chat-empty"><div style="font-size:28px;margin-bottom:12px;opacity:0.3">*</div><h3>Assistant IA Opérations</h3><p>Posez une question sur vos opérations</p></div>';
   document.querySelectorAll('.conv-item').forEach(el => el.classList.remove('active'));
   showPanel('chat');
 }
