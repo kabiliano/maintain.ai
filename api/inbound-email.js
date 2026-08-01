@@ -82,6 +82,17 @@ function extractBody(content) {
   return '';
 }
 
+// Les prompts "Patrimoine" produisent : Urgence / Responsabilité / --- / [email].
+// Seul ce qui suit le dernier séparateur "---" doit partir au destinataire —
+// le reste est une analyse interne destinée au gestionnaire, pas au client.
+function extractEmailBody(agentResponse) {
+  const lines = agentResponse.split('\n');
+  let lastSepIdx = -1;
+  lines.forEach((line, i) => { if (line.trim() === '---') lastSepIdx = i; });
+  const raw = lastSepIdx === -1 ? agentResponse : lines.slice(lastSepIdx + 1).join('\n');
+  return raw.replace(/\*\*(.*?)\*\*/g, '$1').replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '$1').trim();
+}
+
 function parseFromHeader(from) {
   const match = from.match(/^(.*?)\s*<(.+)>$/);
   if (match) return { name: match[1].trim().replace(/^"|"$/g, ''), email: match[2].trim() };
@@ -149,10 +160,11 @@ export default async function handler(req, res) {
 
     let draftReply = '';
     if (targetAgent) {
-      draftReply = await callClaude(
+      const rawReply = await callClaude(
         `${targetAgent.prompt}\n\nOrganisation : ${org.name}`,
         emailText
       );
+      draftReply = extractEmailBody(rawReply);
     }
 
     await sb('inbound_emails', {
