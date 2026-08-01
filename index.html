@@ -915,8 +915,27 @@ async function sendChat() {
         allReplies.push({ agent: agent.name, reply });
       }
 
+      const expertsBlock = allReplies.map(r => `[${r.agent}] ${r.reply}`).join('\n\n');
+
+      // Si plusieurs experts ont répondu, les faire dialoguer pour produire une synthèse finale
+      let synthesis = null;
+      if (allReplies.length > 1) {
+        appendThinking('Synthèse des avis experts');
+        const synthesisPrompt = `Tu es le Manager de WRZ Ops. Plusieurs experts ont été consultés sur la question de l'utilisateur. Voici leurs avis individuels :
+
+${expertsBlock}
+
+Synthétise ces avis en une réponse finale unique et actionnable. Croise vraiment leurs analyses : mets en avant les points de consensus, signale clairement les points de désaccord ou de nuance entre experts s'il y en a, et conclus par une recommandation claire.
+
+Réponds en français, de façon structurée et concise.`;
+        synthesis = await callAPI(synthesisPrompt, [{ role: 'user', content: text }]);
+        document.getElementById('thinking-row')?.remove();
+        appendBubble('assistant', 'Synthèse des experts', null, 'routing');
+        appendBubble('assistant', synthesis);
+      }
+
       // Sauvegarder en base
-      const combinedReply = allReplies.map(r => `[${r.agent}] ${r.reply}`).join('\n\n');
+      const combinedReply = synthesis ? `${expertsBlock}\n\n[Synthèse] ${synthesis}` : expertsBlock;
       convMessages.push({ role: 'assistant', content: combinedReply });
       await saveMessages(text, combinedReply, null);
 
