@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MAINTAIN - Agent IA Maintenance</title>
+<title>WRZ Ops - Agent IA Maintenance</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16.png">
@@ -208,7 +208,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   <div class="login-box">
     <div class="login-logo">
       <div class="login-logo-mark"><span></span></div>
-      <div><h1>MAINTAIN</h1><p>AGENT IA MAINTENANCE INDUSTRIELLE</p></div>
+      <div><h1>WRZ OPS</h1><p>AGENT IA MAINTENANCE INDUSTRIELLE</p></div>
     </div>
     <h2>CONNEXION</h2>
     <div class="field"><label>EMAIL</label><input type="email" id="login-email" placeholder="votre@email.com" /></div>
@@ -223,7 +223,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   <div class="login-box">
     <div class="login-logo">
       <div class="login-logo-mark"><span></span></div>
-      <div><h1>MAINTAIN</h1><p>AGENT IA MAINTENANCE INDUSTRIELLE</p></div>
+      <div><h1>WRZ OPS</h1><p>AGENT IA MAINTENANCE INDUSTRIELLE</p></div>
     </div>
     <h2>BIENVENUE — DÉFINISSEZ VOTRE MOT DE PASSE</h2>
     <p class="setpw-account">Compte : <span id="setpw-email"></span></p>
@@ -239,7 +239,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   <div class="topbar">
     <div class="topbar-left">
       <button class="hamburger" onclick="toggleSidebar()"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg></button>
-      <span class="topbar-logo">MAINTAIN</span>
+      <span class="topbar-logo">WRZ OPS</span>
       <div class="topbar-sep"></div>
       <div class="org-switcher" id="org-switcher">
         <button class="org-switcher-btn" onclick="toggleOrgDropdown()">
@@ -880,7 +880,7 @@ async function sendChat() {
       const availableAgents = agents.filter(a => !a.name?.toLowerCase().includes('manager'));
       const agentList = availableAgents.map(a => `- ${a.name} : ${a.description||''}`).join('\n');
       
-      const managerPrompt = `Tu es le Manager de MAINTAIN. Analyse la question et décide si elle mérite une réponse d'UN seul expert ou de PLUSIEURS experts (multi-avis).
+      const managerPrompt = `Tu es le Manager de WRZ Ops. Analyse la question et décide si elle mérite une réponse d'UN seul expert ou de PLUSIEURS experts (multi-avis).
 
 AGENTS DISPONIBLES :
 ${agentList}

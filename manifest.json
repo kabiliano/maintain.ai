@@ -1,6 +1,6 @@
 {
-  "name": "MAINTAIN — Agent IA Maintenance",
-  "short_name": "MAINTAIN",
+  "name": "WRZ Ops — Agent IA Maintenance",
+  "short_name": "WRZ Ops",
   "description": "Agent IA de maintenance industrielle",
   "start_url": "/",
   "display": "standalone",
