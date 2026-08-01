@@ -268,6 +268,20 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   </div>
 </div>
 
+<!-- TRIAL EXPIRED -->
+<div id="trial-expired-screen" style="display:none;min-height:100vh;align-items:center;justify-content:center;background:var(--bg);">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="login-logo-mark"><span></span></div>
+      <div><h1>WRZ OPS</h1><p>AGENTS IA POUR VOS OPÉRATIONS</p></div>
+    </div>
+    <h2>VOTRE ESSAI EST TERMINÉ</h2>
+    <p style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:20px;">Votre période d'essai de 7 jours est arrivée à son terme. Choisissez une offre pour continuer à utiliser WRZ Ops avec votre équipe.</p>
+    <a class="btn-primary" style="display:block;text-align:center;text-decoration:none;" href="https://wrz-digital.com/tarifs/">VOIR LES OFFRES →</a>
+    <button class="logout-btn" style="width:100%;margin-top:10px;" onclick="doLogout()">DÉCONNEXION</button>
+  </div>
+</div>
+
 <!-- APP -->
 <div id="app">
   <div class="topbar">
@@ -286,6 +300,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
         </div>
       </div>
       <span class="org-name" id="org-display-simple">—</span>
+      <span class="tag tag-orange hidden" id="trial-badge"></span>
     </div>
     <div class="topbar-right">
       <div class="user-chip">
@@ -526,6 +541,14 @@ async function initApp(user) {
     currentOrg = orgData;
   }
 
+  // Bloquer l'accès si l'essai a expiré (les superadmins gardent l'accès pour pouvoir inspecter/aider)
+  if (currentOrg?.plan === 'trial' && currentOrg?.trial_ends_at && profile.role !== 'superadmin'
+      && new Date(currentOrg.trial_ends_at) < new Date()) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('trial-expired-screen').style.display = 'flex';
+    return;
+  }
+
   // Afficher l'app
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').classList.add('visible');
@@ -547,10 +570,23 @@ async function initApp(user) {
     await refreshInboxCount();
   }
 
+  renderTrialBadge();
   await loadAgents();
   await loadDocs();
   await loadConversations();
   renderOrgSwitcher();
+}
+
+function renderTrialBadge() {
+  const badge = document.getElementById('trial-badge');
+  if (!badge) return;
+  if (currentOrg?.plan === 'trial' && currentOrg?.trial_ends_at) {
+    const daysLeft = Math.max(0, Math.ceil((new Date(currentOrg.trial_ends_at) - new Date()) / 86400000));
+    badge.textContent = `ESSAI · ${daysLeft} J RESTANT${daysLeft > 1 ? 'S' : ''}`;
+    badge.classList.remove('hidden');
+  } else {
+    badge.classList.add('hidden');
+  }
 }
 
 // ── PANELS ──
@@ -607,6 +643,7 @@ async function switchOrg(orgId) {
   currentOrg = org;
   localStorage.setItem('maintain_org', orgId);
   document.getElementById('org-dropdown')?.classList.remove('open');
+  renderTrialBadge();
   await loadAgents(); await loadDocs(); await loadConversations();
   newConversation(); renderOrgSwitcher();
   toast('Organisation : ' + org.name);

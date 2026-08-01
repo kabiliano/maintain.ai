@@ -42,9 +42,10 @@ export default async function handler(req, res) {
   }
 
   try {
+    const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     const [org] = await sb('organizations', {
       method: 'POST',
-      body: JSON.stringify({ name: companyName, slug: slugify(companyName), plan: 'trial' })
+      body: JSON.stringify({ name: companyName, slug: slugify(companyName), plan: 'trial', trial_ends_at: trialEndsAt })
     });
 
     await sb('agents', {
