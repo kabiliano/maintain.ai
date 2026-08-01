@@ -878,20 +878,10 @@ async function sendChat() {
     if (isManager) {
       appendThinking('Analyse en cours');
       const availableAgents = agents.filter(a => !a.name?.toLowerCase().includes('manager'));
-      const agentList = availableAgents.map(a => `- ${a.name} : ${a.description||''}`).join('\n');
-      
-      const managerPrompt = `Tu es le Manager de WRZ Ops. Analyse la question et décide si elle mérite une réponse d'UN seul expert ou de PLUSIEURS experts (multi-avis).
 
-AGENTS DISPONIBLES :
-${agentList}
-
-Règle : si la question est multi-dimensionnelle (touche à plusieurs domaines), retourne plusieurs agents (max 3).
-Si la question est précise et mono-domaine, retourne un seul agent.
-
-Réponds UNIQUEMENT en JSON :
-{"agents": ["nom_exact_1", "nom_exact_2"], "raison": "explication courte", "multi": true/false}`;
-
-      const routingReply = await callAPI(managerPrompt, [{ role: 'user', content: text }]);
+      // Le prompt de routage vient de l'agent Manager configuré pour cette organisation
+      // (chaque org peut avoir son propre schéma JSON de sortie — urgence, multi-experts, etc.)
+      const routingReply = await callAPI(currentAgent.prompt, [{ role: 'user', content: text }]);
       document.getElementById('thinking-row')?.remove();
 
       let targetAgents = [];
@@ -900,10 +890,11 @@ Réponds UNIQUEMENT en JSON :
         const names = Array.isArray(routing.agents) ? routing.agents : [routing.agent || routing.agents];
         targetAgents = names.map(n => availableAgents.find(a => a.name === n)).filter(Boolean);
         if (!targetAgents.length) targetAgents = [availableAgents[0]];
-        
+
         const isMulti = routing.multi && targetAgents.length > 1;
+        const reasonText = routing.raison || routing.resume || '';
         const agentsLabel = targetAgents.map(a => `${a.icon} ${a.name}`).join(' · ');
-        appendBubble('assistant', `${currentAgent.icon} ${isMulti ? 'Consultation multi-experts' : 'Routé vers'} **${agentsLabel}** - ${routing.raison}`, null, 'routing');
+        appendBubble('assistant', `${currentAgent.icon} ${isMulti ? 'Consultation multi-experts' : 'Routé vers'} **${agentsLabel}** - ${reasonText}`, null, 'routing');
       } catch(e) { targetAgents = [availableAgents[0]]; }
 
       // Appeler chaque agent et afficher sa réponse
