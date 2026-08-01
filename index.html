@@ -178,6 +178,25 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .inbox-tab { font-family: var(--mono); font-size: 11.5px; color: var(--text2); background: var(--bg2); border: 0.5px solid var(--border2); border-radius: 20px; padding: 6px 14px; cursor: pointer; transition: all 0.15s; }
 .inbox-tab:hover { color: var(--text); border-color: var(--border2); }
 .inbox-tab.active { color: var(--accent); border-color: rgba(0,224,160,0.4); background: rgba(0,224,160,0.08); }
+
+.inbox-row { display: flex; align-items: center; gap: 12px; background: var(--bg2); border: 0.5px solid var(--border); border-radius: 10px; padding: 12px 16px; margin-bottom: 8px; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+.inbox-row:hover { border-color: var(--border2); background: var(--bg3); }
+.inbox-row-from { font-size: 13px; font-weight: 600; width: 160px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inbox-row-subject { font-size: 13px; color: var(--text2); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inbox-row-tags { display: flex; gap: 6px; flex-shrink: 0; }
+.inbox-row-date { font-size: 11px; color: var(--text3); font-family: var(--mono); flex-shrink: 0; width: 90px; text-align: right; }
+
+.inbox-detail.visible { display: block; }
+.inbox-back { background: none; border: none; color: var(--text2); font-family: var(--mono); font-size: 12px; cursor: pointer; margin-bottom: 18px; display: inline-flex; align-items: center; gap: 6px; }
+.inbox-back:hover { color: var(--accent); }
+.inbox-detail-head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+.inbox-detail-head h3 { font-size: 18px; font-weight: 700; }
+.inbox-detail-meta { font-size: 12px; color: var(--text2); font-family: var(--mono); margin-bottom: 22px; }
+.inbox-detail-label { font-family: var(--mono); font-size: 10px; color: var(--text3); letter-spacing: 0.08em; margin-bottom: 8px; }
+.inbox-detail-body { background: var(--bg2); border: 0.5px solid var(--border); border-radius: 10px; padding: 18px 20px; font-size: 14px; line-height: 1.6; color: var(--text); max-height: 260px; overflow-y: auto; white-space: pre-wrap; margin-bottom: 26px; }
+.inbox-detail-reply { width: 100%; background: var(--bg2); border: 0.5px solid var(--border2); border-radius: 10px; color: var(--text); font-size: 15px; line-height: 1.6; font-family: var(--sans); padding: 18px 20px; resize: vertical; min-height: 240px; margin-bottom: 16px; }
+.inbox-detail-reply:focus { outline: none; border-color: var(--accent); }
+.inbox-detail-actions { display: flex; gap: 10px; }
 .card h3 { font-size: 14px; font-weight: 600; margin-bottom: 14px; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
 .form-group label { display: block; font-family: var(--mono); font-size: 10px; color: var(--text2); margin-bottom: 4px; letter-spacing: 0.08em; }
@@ -365,6 +384,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
         <div class="panel-header"><div><h2>Boîte mail</h2><p>Emails reçus, triés automatiquement — rien ne part sans validation</p></div></div>
         <div class="inbox-tabs" id="inbox-tabs"></div>
         <div id="inbox-list"></div>
+        <div id="inbox-detail" class="hidden"></div>
       </div>
 
       <!-- ADMIN -->
@@ -540,7 +560,7 @@ function showPanel(name) {
   document.getElementById('panel-inbox').classList.toggle('visible', name==='inbox');
   document.getElementById('panel-admin').classList.toggle('visible', name==='admin');
   ['chat','docs','inbox','admin'].forEach(p => document.getElementById('nav-'+p)?.classList.toggle('active', p===name));
-  if (name === 'inbox') loadInbox();
+  if (name === 'inbox') { closeInboxDetail(); loadInbox(); }
   closeSidebarOnMobile();
 }
 
@@ -1143,34 +1163,65 @@ function renderInbox() {
   if (!items.length) { list.innerHTML = '<div style="font-size:12px;color:var(--text3);font-family:var(--mono);">Rien à afficher dans cet onglet.</div>'; return; }
   list.innerHTML = items.map(item => {
     const urgenceTag = item.urgence
-      ? `<span class="tag ${item.urgence>=4?'tag-red':item.urgence===3?'tag-orange':'tag-gray'}">URGENCE ${item.urgence}/5</span>`
+      ? `<span class="tag ${item.urgence>=4?'tag-red':item.urgence===3?'tag-orange':'tag-gray'}">${item.urgence}/5</span>`
       : '';
-    const statusTag = item.status === 'sent' ? '<span class="tag tag-green">ENVOYÉ</span>'
-      : item.status === 'rejected' ? '<span class="tag tag-gray">REJETÉ</span>'
-      : '<span class="tag tag-blue">EN ATTENTE</span>';
-    const agentTag = item.agent_name ? `<span class="tag tag-gray">${item.agent_name}</span>` : '';
-    const disabled = item.status !== 'pending' ? 'disabled' : '';
+    const statusDot = item.status === 'sent' ? 'tag-green' : item.status === 'rejected' ? 'tag-gray' : 'tag-blue';
     return `
-      <div class="card" id="inbox-item-${item.id}">
-        <div class="inbox-item-head">
-          <strong>${item.from_name || item.from_email}</strong>
-          ${statusTag} ${urgenceTag} ${agentTag}
-        </div>
-        <div class="inbox-item-meta">${item.from_email} · ${item.subject || '(sans objet)'} · ${new Date(item.created_at).toLocaleString('fr-FR')}</div>
-        <div class="inbox-body">${(item.body || '').slice(0, 500)}</div>
-        <textarea class="inbox-reply" id="inbox-reply-${item.id}" ${disabled}>${item.draft_reply || ''}</textarea>
-        <div class="inbox-actions">
-          <button class="btn-sm" ${disabled} onclick="sendInboxReply('${item.id}')">Envoyer →</button>
-          <button class="btn-sm" style="background:rgba(255,77,77,0.1);color:var(--danger);border-color:rgba(255,77,77,0.3);" ${disabled} onclick="rejectInboxEmail('${item.id}')">Rejeter</button>
-        </div>
+      <div class="inbox-row" onclick="openInboxItem('${item.id}')">
+        <span class="tag ${statusDot}">${item.status === 'sent' ? 'ENVOYÉ' : item.status === 'rejected' ? 'REJETÉ' : 'EN ATTENTE'}</span>
+        <span class="inbox-row-from">${item.from_name || item.from_email}</span>
+        <span class="inbox-row-subject">${item.subject || '(sans objet)'}</span>
+        <span class="inbox-row-tags">${urgenceTag} ${item.agent_name ? `<span class="tag tag-gray">${item.agent_name}</span>` : ''}</span>
+        <span class="inbox-row-date">${new Date(item.created_at).toLocaleDateString('fr-FR')}</span>
       </div>`;
   }).join('');
+}
+
+function openInboxItem(id) {
+  const item = inboxItems.find(i => i.id === id);
+  if (!item) return;
+  const urgenceTag = item.urgence
+    ? `<span class="tag ${item.urgence>=4?'tag-red':item.urgence===3?'tag-orange':'tag-gray'}">URGENCE ${item.urgence}/5</span>`
+    : '';
+  const statusTag = item.status === 'sent' ? '<span class="tag tag-green">ENVOYÉ</span>'
+    : item.status === 'rejected' ? '<span class="tag tag-gray">REJETÉ</span>'
+    : '<span class="tag tag-blue">EN ATTENTE</span>';
+  const agentTag = item.agent_name ? `<span class="tag tag-gray">${item.agent_name}</span>` : '';
+  const disabled = item.status !== 'pending' ? 'disabled' : '';
+
+  document.getElementById('inbox-detail').innerHTML = `
+    <button class="inbox-back" onclick="closeInboxDetail()">← Retour à la liste</button>
+    <div class="inbox-detail-head">
+      <h3>${item.from_name || item.from_email}</h3>
+      ${statusTag} ${urgenceTag} ${agentTag}
+    </div>
+    <div class="inbox-detail-meta">${item.from_email} · ${item.subject || '(sans objet)'} · ${new Date(item.created_at).toLocaleString('fr-FR')}</div>
+    <div class="inbox-detail-label">MESSAGE REÇU</div>
+    <div class="inbox-detail-body">${item.body || '(vide)'}</div>
+    <div class="inbox-detail-label">RÉPONSE${item.status === 'pending' ? ' (MODIFIABLE)' : ''}</div>
+    <textarea class="inbox-detail-reply" id="inbox-detail-reply" ${disabled}>${item.draft_reply || ''}</textarea>
+    <div class="inbox-detail-actions">
+      <button class="btn-sm" ${disabled} onclick="sendInboxReply('${item.id}')">Envoyer →</button>
+      <button class="btn-sm" style="background:rgba(255,77,77,0.1);color:var(--danger);border-color:rgba(255,77,77,0.3);" ${disabled} onclick="rejectInboxEmail('${item.id}')">Rejeter</button>
+    </div>`;
+
+  document.getElementById('inbox-list').classList.add('hidden');
+  document.getElementById('inbox-tabs').classList.add('hidden');
+  document.getElementById('inbox-detail').classList.remove('hidden');
+  document.getElementById('inbox-detail').classList.add('visible');
+}
+
+function closeInboxDetail() {
+  document.getElementById('inbox-detail').classList.remove('visible');
+  document.getElementById('inbox-detail').classList.add('hidden');
+  document.getElementById('inbox-list').classList.remove('hidden');
+  document.getElementById('inbox-tabs').classList.remove('hidden');
 }
 
 async function sendInboxReply(id) {
   const { data: item } = await sb.from('inbound_emails').select('*').eq('id', id).single();
   if (!item) return;
-  const textarea = document.getElementById(`inbox-reply-${id}`);
+  const textarea = document.getElementById('inbox-detail-reply');
   const body = textarea.value.trim();
   if (!body) { toast('Réponse vide', 'error'); return; }
   const orgId = currentOrg?.id || currentProfile?.org_id;
@@ -1186,6 +1237,7 @@ async function sendInboxReply(id) {
     if (!res.ok) { toast('Erreur : ' + (result.error || 'échec envoi'), 'error'); return; }
     await sb.from('inbound_emails').update({ status: 'sent', sent_at: new Date().toISOString(), draft_reply: body }).eq('id', id);
     toast('Réponse envoyée à ' + item.from_email);
+    closeInboxDetail();
     await loadInbox(); await refreshInboxCount();
   } catch (e) {
     toast('Erreur : ' + e.message, 'error');
@@ -1196,6 +1248,7 @@ async function rejectInboxEmail(id) {
   if (!confirm('Rejeter cet email sans répondre ?')) return;
   await sb.from('inbound_emails').update({ status: 'rejected' }).eq('id', id);
   toast('Email rejeté');
+  closeInboxDetail();
   await loadInbox(); await refreshInboxCount();
 }
 
