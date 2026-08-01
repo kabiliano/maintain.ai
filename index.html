@@ -162,7 +162,18 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 /* ADMIN */
 #panel-admin { flex: 1; overflow-y: auto; padding: 24px; display: none; }
 #panel-admin.visible { display: block; }
+#panel-inbox { flex: 1; overflow-y: auto; padding: 24px; display: none; }
+#panel-inbox.visible { display: block; }
 .card { background: var(--bg2); border: 0.5px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+.inbox-item-head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; flex-wrap: wrap; }
+.inbox-item-head strong { font-size: 14px; }
+.inbox-item-meta { font-size: 11px; color: var(--text2); font-family: var(--mono); margin-bottom: 14px; }
+.inbox-body { background: var(--bg3); border: 0.5px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 12.5px; color: var(--text2); max-height: 120px; overflow-y: auto; margin-bottom: 14px; white-space: pre-wrap; }
+.inbox-reply { width: 100%; background: var(--bg3); border: 0.5px solid var(--border2); border-radius: 8px; color: var(--text); font-size: 13px; font-family: var(--sans); padding: 10px 13px; resize: vertical; min-height: 90px; margin-bottom: 12px; }
+.inbox-reply:focus { outline: none; border-color: var(--accent); }
+.inbox-actions { display: flex; gap: 10px; }
+.tag-red { color: var(--danger); border-color: rgba(255,77,77,0.3); background: rgba(255,77,77,0.07); }
+.tag-orange { color: var(--warn); border-color: rgba(255,170,0,0.3); background: rgba(255,170,0,0.07); }
 .card h3 { font-size: 14px; font-weight: 600; margin-bottom: 14px; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
 .form-group label { display: block; font-family: var(--mono); font-size: 10px; color: var(--text2); margin-bottom: 4px; letter-spacing: 0.08em; }
@@ -194,7 +205,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   .msg-bubble { font-size: 14px; max-width: 85vw; }
   .chat-input-wrap { padding: 10px 12px; }
   .chat-input-wrap textarea { font-size: 16px; }
-  #panel-docs, #panel-admin { padding: 14px; }
+  #panel-docs, #panel-admin, #panel-inbox { padding: 14px; }
   .form-row { grid-template-columns: 1fr; }
   .doc-grid { grid-template-columns: 1fr; }
   .login-box { width: 90vw; padding: 28px 20px; }
@@ -277,6 +288,11 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
           Documents
           <span class="tag tag-green" id="doc-count-tag" style="margin-left:auto">0</span>
         </div>
+        <div class="nav-item hidden" id="nav-inbox" onclick="showPanel('inbox')">
+          <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>
+          Boîte mail
+          <span class="tag tag-blue hidden" id="inbox-count-tag" style="margin-left:auto">0</span>
+        </div>
         <div class="nav-item hidden" id="nav-admin" onclick="showPanel('admin')">
           <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
           Admin
@@ -338,6 +354,12 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
           <span>PDF, TXT - manuels, procédures, fiches techniques</span>
         </div>
         <div class="doc-grid" id="doc-grid"></div>
+      </div>
+
+      <!-- INBOX -->
+      <div id="panel-inbox">
+        <div class="panel-header"><div><h2>Boîte mail</h2><p>Emails reçus, triés automatiquement — rien ne part sans validation</p></div></div>
+        <div id="inbox-list"></div>
       </div>
 
       <!-- ADMIN -->
@@ -495,7 +517,9 @@ async function initApp(user) {
 
   if (role === 'superadmin' || role === 'admin') {
     document.getElementById('nav-admin').classList.remove('hidden');
+    document.getElementById('nav-inbox').classList.remove('hidden');
     await loadAdminData();
+    await refreshInboxCount();
   }
 
   await loadAgents();
@@ -508,8 +532,10 @@ async function initApp(user) {
 function showPanel(name) {
   document.getElementById('panel-chat').style.display = name==='chat' ? 'flex' : 'none';
   document.getElementById('panel-docs').classList.toggle('visible', name==='docs');
+  document.getElementById('panel-inbox').classList.toggle('visible', name==='inbox');
   document.getElementById('panel-admin').classList.toggle('visible', name==='admin');
-  ['chat','docs','admin'].forEach(p => document.getElementById('nav-'+p)?.classList.toggle('active', p===name));
+  ['chat','docs','inbox','admin'].forEach(p => document.getElementById('nav-'+p)?.classList.toggle('active', p===name));
+  if (name === 'inbox') loadInbox();
   closeSidebarOnMobile();
 }
 
@@ -1055,6 +1081,87 @@ async function loadAdminData() {
   const sel = document.getElementById('inv-org');
   if (sel) sel.innerHTML = allOrgs.map(o => `<option value="${o.id}">${o.name}</option>`).join('');
   renderOrgSwitcher();
+}
+
+// ── INBOX (emails entrants) ──
+async function refreshInboxCount() {
+  const orgId = currentOrg?.id || currentProfile?.org_id;
+  if (!orgId) return;
+  const { count } = await sb.from('inbound_emails').select('id', { count: 'exact', head: true }).eq('org_id', orgId).eq('status', 'pending');
+  const tag = document.getElementById('inbox-count-tag');
+  if (!tag) return;
+  if (count) { tag.textContent = count; tag.classList.remove('hidden'); }
+  else { tag.classList.add('hidden'); }
+}
+
+async function loadInbox() {
+  const orgId = currentOrg?.id || currentProfile?.org_id;
+  if (!orgId) return;
+  const { data, error } = await sb.from('inbound_emails').select('*').eq('org_id', orgId).order('created_at', { ascending: false });
+  if (error) { console.error('loadInbox error', error); return; }
+  renderInbox(data || []);
+}
+
+function renderInbox(items) {
+  const list = document.getElementById('inbox-list');
+  if (!list) return;
+  if (!items.length) { list.innerHTML = '<div style="font-size:12px;color:var(--text3);font-family:var(--mono);">Aucun email reçu pour le moment.</div>'; return; }
+  list.innerHTML = items.map(item => {
+    const urgenceTag = item.urgence
+      ? `<span class="tag ${item.urgence>=4?'tag-red':item.urgence===3?'tag-orange':'tag-gray'}">URGENCE ${item.urgence}/5</span>`
+      : '';
+    const statusTag = item.status === 'sent' ? '<span class="tag tag-green">ENVOYÉ</span>'
+      : item.status === 'rejected' ? '<span class="tag tag-gray">REJETÉ</span>'
+      : '<span class="tag tag-blue">EN ATTENTE</span>';
+    const agentTag = item.agent_name ? `<span class="tag tag-gray">${item.agent_name}</span>` : '';
+    const disabled = item.status !== 'pending' ? 'disabled' : '';
+    return `
+      <div class="card" id="inbox-item-${item.id}">
+        <div class="inbox-item-head">
+          <strong>${item.from_name || item.from_email}</strong>
+          ${statusTag} ${urgenceTag} ${agentTag}
+        </div>
+        <div class="inbox-item-meta">${item.from_email} · ${item.subject || '(sans objet)'} · ${new Date(item.created_at).toLocaleString('fr-FR')}</div>
+        <div class="inbox-body">${(item.body || '').slice(0, 500)}</div>
+        <textarea class="inbox-reply" id="inbox-reply-${item.id}" ${disabled}>${item.draft_reply || ''}</textarea>
+        <div class="inbox-actions">
+          <button class="btn-sm" ${disabled} onclick="sendInboxReply('${item.id}')">Envoyer →</button>
+          <button class="btn-sm" style="background:rgba(255,77,77,0.1);color:var(--danger);border-color:rgba(255,77,77,0.3);" ${disabled} onclick="rejectInboxEmail('${item.id}')">Rejeter</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function sendInboxReply(id) {
+  const { data: item } = await sb.from('inbound_emails').select('*').eq('id', id).single();
+  if (!item) return;
+  const textarea = document.getElementById(`inbox-reply-${id}`);
+  const body = textarea.value.trim();
+  if (!body) { toast('Réponse vide', 'error'); return; }
+  const orgId = currentOrg?.id || currentProfile?.org_id;
+  const org = allOrgs.find(o => o.id === orgId) || currentOrg;
+  const from = `${org?.slug || 'contact'}@send.wrz-digital.com`;
+
+  try {
+    const res = await fetch('/api/send-reply', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from, to: item.from_email, subject: item.subject, body })
+    });
+    const result = await res.json();
+    if (!res.ok) { toast('Erreur : ' + (result.error || 'échec envoi'), 'error'); return; }
+    await sb.from('inbound_emails').update({ status: 'sent', sent_at: new Date().toISOString(), draft_reply: body }).eq('id', id);
+    toast('Réponse envoyée à ' + item.from_email);
+    await loadInbox(); await refreshInboxCount();
+  } catch (e) {
+    toast('Erreur : ' + e.message, 'error');
+  }
+}
+
+async function rejectInboxEmail(id) {
+  if (!confirm('Rejeter cet email sans répondre ?')) return;
+  await sb.from('inbound_emails').update({ status: 'rejected' }).eq('id', id);
+  toast('Email rejeté');
+  await loadInbox(); await refreshInboxCount();
 }
 
 async function createOrg() {
