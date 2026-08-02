@@ -930,6 +930,53 @@ async function executeMaintenanceTool(name, input, orgId) {
   }
 }
 
+// ── TOOLS BOÎTE MAIL (accès en lecture aux emails entrants, tous agents) ──
+const MAILBOX_TOOLS = [
+  {
+    name: "get_recent_emails",
+    description: "Liste les emails récemment reçus dans la boîte mail de l'organisation (expéditeur, sujet, urgence, statut, date de réception). Utile pour répondre à des questions du type \"avons-nous reçu des emails aujourd'hui / récemment ?\" ou \"y a-t-il des demandes en attente ?\".",
+    input_schema: {
+      type: "object",
+      properties: {
+        limit: { type: "number", description: "Nombre d'emails à retourner (défaut 10, max 30)" },
+        status: { type: "string", enum: ["pending", "sent", "rejected", "all"], description: "Filtrer par statut (défaut : tous)" }
+      },
+      required: []
+    }
+  }
+];
+
+async function executeMailboxTool(name, input, orgId) {
+  if (name !== 'get_recent_emails') return { error: 'Tool inconnu: ' + name };
+  try {
+    const limit = Math.min(Math.max(parseInt(input.limit) || 10, 1), 30);
+    let query = sb.from('inbound_emails')
+      .select('from_email, from_name, subject, urgence, status, created_at')
+      .eq('org_id', orgId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (input.status && input.status !== 'all') query = query.eq('status', input.status);
+    const { data, error } = await query;
+    if (error) throw error;
+    return data;
+  } catch (e) {
+    return { error: e.message };
+  }
+}
+
+// Tous les agents ont accès à la boîte mail ; l'agent Maintenance a en plus
+// accès aux données compresseurs temps réel.
+function getAgentTools(agent) {
+  const tools = [...MAILBOX_TOOLS];
+  if (agent?.name?.toLowerCase().includes('maintenance')) tools.push(...MAINTENANCE_TOOLS);
+  return tools;
+}
+
+async function executeAgentTool(name, input, orgId) {
+  if (name === 'get_recent_emails') return executeMailboxTool(name, input, orgId);
+  return executeMaintenanceTool(name, input, orgId);
+}
+
 // ── FOOTBALL API ──
 async function fetchFootball(endpoint, params) {
   try {
@@ -1080,11 +1127,8 @@ async function sendChat() {
       let allReplies = [];
       for (const agent of targetAgents) {
         appendThinking(`${agent.icon} ${agent.name} analyse`);
-        const isMaintenanceAgent = agent.name?.toLowerCase().includes('maintenance');
         const orgId = currentOrg?.id || currentProfile?.org_id;
-        const reply = isMaintenanceAgent
-          ? await callAgentAPIWithTools(agent.id, convMessages, MAINTENANCE_TOOLS, orgId, executeMaintenanceTool, { docsCtx, footballCtx })
-          : await callAgentAPI(agent.id, convMessages, { docsCtx, footballCtx });
+        const reply = await callAgentAPIWithTools(agent.id, convMessages, getAgentTools(agent), orgId, executeAgentTool, { docsCtx, footballCtx });
         document.getElementById('thinking-row')?.remove();
         const srcMatch = reply.match(/\[Source:\s*([^\]]+)\]/);
         const cleanReply = reply.replace(/\[Source:[^\]]+\]/g,'').trim();
@@ -1120,11 +1164,8 @@ Réponds en français, de façon structurée et concise.`;
     } else {
       // Agent unique direct
       appendThinking(currentAgent.icon + ' ' + currentAgent.name + ' analyse');
-      const isMaintenanceAgent = currentAgent?.name?.toLowerCase().includes('maintenance');
       const orgId = currentOrg?.id || currentProfile?.org_id;
-      const reply = isMaintenanceAgent
-        ? await callAgentAPIWithTools(currentAgent.id, convMessages, MAINTENANCE_TOOLS, orgId, executeMaintenanceTool, { docsCtx, footballCtx })
-        : await callAgentAPI(currentAgent.id, convMessages, { docsCtx, footballCtx });
+      const reply = await callAgentAPIWithTools(currentAgent.id, convMessages, getAgentTools(currentAgent), orgId, executeAgentTool, { docsCtx, footballCtx });
       document.getElementById('thinking-row')?.remove();
       const srcMatch = reply.match(/\[Source:\s*([^\]]+)\]/);
       const cleanReply = reply.replace(/\[Source:[^\]]+\]/g,'').trim();
