@@ -3,6 +3,9 @@
 // this into a serverless function.
 
 const SUPABASE_URL = 'https://cjlizuuaxucbpqykregv.supabase.co';
+// Clé anon (publique, déjà utilisée côté client dans index.html) : /auth/v1/user
+// n'accepte pas la clé service_role comme apikey, seulement une clé anon/publishable.
+const SUPABASE_ANON_KEY = 'sb_publishable_V-liQ8IOYnAFOLFXwDuDTw_EMprVMq1';
 
 export async function sbAdmin(path, options = {}) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
@@ -24,7 +27,7 @@ export async function getUserFromToken(authHeader) {
   const token = authHeader.slice(7);
   const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
     headers: {
-      apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+      apikey: SUPABASE_ANON_KEY,
       Authorization: `Bearer ${token}`
     }
   });

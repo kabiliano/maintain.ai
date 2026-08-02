@@ -860,7 +860,12 @@ async function callAgentAPIWithTools(agentId, messages, tools, orgId, executeToo
   return "Désolé, trop d'itérations pour répondre.";
 }
 
-// ── TOOLS MAINTENANCE (accès données Supabase temps réel) ──
+// ── TOOLS MAINTENANCE (accès données AirWatch temps réel, via /api/airwatch-tools) ──
+// Les données vivent dans un projet Supabase séparé (celui d'AirWatch, pas
+// celui de WRZ Ops) : on ne peut pas l'interroger directement depuis le
+// navigateur (RLS AirWatch exige une session AirWatch, que l'utilisateur WRZ
+// Ops n'a pas). Chaque tool passe donc par l'endpoint serveur qui détient la
+// clé service_role AirWatch et applique lui-même le filtrage par organisation.
 const MAINTENANCE_TOOLS = [
   {
     name: "get_compresseurs_liste",
@@ -892,39 +897,33 @@ const MAINTENANCE_TOOLS = [
       },
       required: ["compressor_name"]
     }
+  },
+  {
+    name: "get_recent_anomalies",
+    description: "Liste les anomalies récentes non résolues détectées sur les relevés (compteur horaire en baisse, saut incohérent).",
+    input_schema: { type: "object", properties: {}, required: [] }
+  },
+  {
+    name: "get_zone_summary",
+    description: "Résumé de l'état de tous les compresseurs d'une zone donnée (ex: PDN, Nit, M, TDJ) : état, compteur horaire, prochaine maintenance.",
+    input_schema: {
+      type: "object",
+      properties: { zone: { type: "string", description: "Nom ou code de la zone, ex: \"PDN\"" } },
+      required: ["zone"]
+    }
   }
 ];
 
-async function executeMaintenanceTool(name, input, orgId) {
+async function executeMaintenanceTool(name, input) {
   try {
-    if (name === 'get_compresseurs_liste') {
-      const { data, error } = await sb.from('compresseurs').select('*').eq('org_id', orgId);
-      if (error) throw error;
-      return data;
-    }
-    if (name === 'get_dernier_releve') {
-      const { data, error } = await sb.from('compresseur_releves')
-        .select('*').eq('org_id', orgId).eq('compressor_name', input.compressor_name)
-        .order('date', { ascending: false }).limit(1);
-      if (error) throw error;
-      return data?.[0] || null;
-    }
-    if (name === 'get_compresseurs_a_risque') {
-      const today = new Date().toISOString().slice(0, 10);
-      const { data, error } = await sb.from('compresseur_releves')
-        .select('*').eq('org_id', orgId)
-        .or(`next_maintenance_date.lte.${today},maintenance_request.not.is.null`);
-      if (error) throw error;
-      return data;
-    }
-    if (name === 'get_historique_releves') {
-      const { data, error } = await sb.from('compresseur_releves')
-        .select('*').eq('org_id', orgId).eq('compressor_name', input.compressor_name)
-        .order('date', { ascending: false }).limit(input.limit || 10);
-      if (error) throw error;
-      return data;
-    }
-    return { error: 'Tool inconnu: ' + name };
+    const res = await fetch('/api/airwatch-tools', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+      body: JSON.stringify({ tool_name: name, input })
+    });
+    const data = await res.json();
+    if (!res.ok) return { error: data.error || `Erreur ${res.status}` };
+    return data.result;
   } catch (e) {
     return { error: e.message };
   }
