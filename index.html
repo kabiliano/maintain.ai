@@ -406,12 +406,13 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
       <div id="panel-admin">
         <div class="panel-header"><div><h2>Administration</h2><p>Gestion des organisations et utilisateurs</p></div></div>
         <div class="card">
-          <h3>Créer une organisation</h3>
+          <h3 id="org-form-title">Créer une organisation</h3>
           <div class="form-row">
             <div class="form-group"><label>NOM</label><input type="text" id="org-name" placeholder="Vinci Construction" /></div>
             <div class="form-group"><label>PLAN</label><select id="org-plan"><option value="trial">Trial</option><option value="starter">Starter</option><option value="pro">Pro</option><option value="enterprise">Enterprise</option></select></div>
           </div>
-          <button class="btn-sm" onclick="createOrg()">Créer</button>
+          <button class="btn-sm" id="org-form-submit" onclick="saveOrg()">Créer</button>
+          <button class="btn-sm" id="org-form-cancel" style="display:none;" onclick="cancelEditOrg()">Annuler</button>
         </div>
         <div class="card">
           <h3>Inviter un utilisateur</h3>
@@ -429,7 +430,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
         <div class="card">
           <h3>Organisations</h3>
           <table class="table" id="orgs-table">
-            <thead><tr><th>NOM</th><th>PLAN</th><th>CRÉÉE LE</th></tr></thead>
+            <thead><tr><th>NOM</th><th>PLAN</th><th>CRÉÉE LE</th><th>ACTIONS</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -1177,7 +1178,7 @@ async function loadAdminData() {
   const { data } = await sb.from('organizations').select('*').order('created_at');
   allOrgs = data || [];
   const tbody = document.querySelector('#orgs-table tbody');
-  if (tbody) tbody.innerHTML = allOrgs.map(o => `<tr><td>${o.name}</td><td><span class="tag ${o.plan==='enterprise'?'tag-green':o.plan==='pro'?'tag-blue':'tag-gray'}">${o.plan.toUpperCase()}</span></td><td>${new Date(o.created_at).toLocaleDateString('fr-FR')}</td></tr>`).join('');
+  if (tbody) tbody.innerHTML = allOrgs.map(o => `<tr><td>${o.name}</td><td><span class="tag ${o.plan==='enterprise'?'tag-green':o.plan==='pro'?'tag-blue':'tag-gray'}">${o.plan.toUpperCase()}</span></td><td>${new Date(o.created_at).toLocaleDateString('fr-FR')}</td><td><button class="btn-sm" onclick="editOrg('${o.id}')">Modifier</button> <button class="btn-sm" style="background:rgba(255,77,77,0.1);color:var(--danger);border-color:rgba(255,77,77,0.3);" onclick="deleteOrg('${o.id}','${o.name.replace(/'/g,"\\'")}')">Supprimer</button></td></tr>`).join('');
   const sel = document.getElementById('inv-org');
   if (sel) sel.innerHTML = allOrgs.map(o => `<option value="${o.id}">${o.name}</option>`).join('');
   renderOrgSwitcher();
@@ -1327,15 +1328,55 @@ async function rejectInboxEmail(id) {
   await loadInbox(); await refreshInboxCount();
 }
 
-async function createOrg() {
+let editingOrgId = null;
+
+async function saveOrg() {
   const name = document.getElementById('org-name').value.trim();
   const plan = document.getElementById('org-plan').value;
   if (!name) { toast('Nom requis', 'error'); return; }
-  const slug = name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'') + '-' + Date.now();
-  const { error } = await sb.from('organizations').insert({ name, slug, plan });
-  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
-  toast('Organisation créée : ' + name);
+
+  if (editingOrgId) {
+    const { error } = await sb.from('organizations').update({ name, plan }).eq('id', editingOrgId);
+    if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+    toast('Organisation mise à jour : ' + name);
+    cancelEditOrg();
+  } else {
+    const slug = name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'') + '-' + Date.now();
+    const { error } = await sb.from('organizations').insert({ name, slug, plan });
+    if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+    toast('Organisation créée : ' + name);
+    document.getElementById('org-name').value = '';
+  }
+  await loadAdminData();
+}
+
+function editOrg(id) {
+  const org = allOrgs.find(o => o.id === id);
+  if (!org) return;
+  editingOrgId = id;
+  document.getElementById('org-name').value = org.name;
+  document.getElementById('org-plan').value = org.plan;
+  document.getElementById('org-form-title').textContent = 'Modifier l\'organisation';
+  document.getElementById('org-form-submit').textContent = 'Enregistrer';
+  document.getElementById('org-form-cancel').style.display = 'inline-block';
+  document.getElementById('org-name').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function cancelEditOrg() {
+  editingOrgId = null;
   document.getElementById('org-name').value = '';
+  document.getElementById('org-plan').value = 'trial';
+  document.getElementById('org-form-title').textContent = 'Créer une organisation';
+  document.getElementById('org-form-submit').textContent = 'Créer';
+  document.getElementById('org-form-cancel').style.display = 'none';
+}
+
+async function deleteOrg(id, name) {
+  if (!confirm(`Supprimer définitivement "${name}" ? Cette action est irréversible et échouera si des utilisateurs, agents ou données lui sont encore rattachés.`)) return;
+  const { error } = await sb.from('organizations').delete().eq('id', id);
+  if (error) { toast('Erreur : ' + error.message, 'error'); return; }
+  toast('Organisation supprimée : ' + name);
+  if (editingOrgId === id) cancelEditOrg();
   await loadAdminData();
 }
 
