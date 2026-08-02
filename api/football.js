@@ -1,7 +1,10 @@
+import { getUserFromToken } from './_lib/shared.js';
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  const user = await getUserFromToken(req.headers.authorization);
+  if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
   const { endpoint, params } = req.body;
   if (!endpoint) return res.status(400).json({ error: 'endpoint requis' });
@@ -12,7 +15,7 @@ export default async function handler(req, res) {
   try {
     const response = await fetch(url.toString(), {
       headers: {
-        'x-apisports-key': '2052a59717960ab894f10b21c3d480e4'
+        'x-apisports-key': process.env.FOOTBALL_API_KEY
       }
     });
     const data = await response.json();

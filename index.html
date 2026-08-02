@@ -1533,18 +1533,14 @@ async function sendInboxReply(id) {
   const textarea = document.getElementById('inbox-detail-reply');
   const body = textarea.value.trim();
   if (!body) { toast('Réponse vide', 'error'); return; }
-  const orgId = currentOrg?.id || currentProfile?.org_id;
-  const org = allOrgs.find(o => o.id === orgId) || currentOrg;
-  const from = `${org?.slug || 'contact'}@send.wrz-digital.com`;
 
   try {
     const res = await fetch('/api/send-reply', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to: item.from_email, subject: item.subject, body })
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+      body: JSON.stringify({ id, body })
     });
     const result = await res.json();
     if (!res.ok) { toast('Erreur : ' + (result.error || 'échec envoi'), 'error'); return; }
-    await sb.from('inbound_emails').update({ status: 'sent', sent_at: new Date().toISOString(), draft_reply: body }).eq('id', id);
     toast('Réponse envoyée à ' + item.from_email);
     closeInboxDetail();
     await loadInbox(); await refreshInboxCount();
