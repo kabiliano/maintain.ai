@@ -737,10 +737,45 @@ function appendThinking(msg) {
 
 function askSuggestion(el) { document.getElementById('chat-input').value = el.textContent; sendChat(); }
 
+// Marque le dernier bloc du dernier message avec un breakpoint de cache éphémère :
+// les tours précédents de la conversation (déjà envoyés lors d'appels antérieurs)
+// sont ainsi relus depuis le cache au lieu d'être retraités à chaque nouveau message.
+function withCacheBreakpoint(messages) {
+  if (!messages || !messages.length) return messages;
+  const msgs = messages.map(m => ({ ...m }));
+  const last = msgs[msgs.length - 1];
+  if (typeof last.content === 'string') {
+    last.content = [{ type: 'text', text: last.content, cache_control: { type: 'ephemeral' } }];
+  } else if (Array.isArray(last.content) && last.content.length) {
+    last.content = last.content.map((b, i) =>
+      i === last.content.length - 1 ? { ...b, cache_control: { type: 'ephemeral' } } : b
+    );
+  }
+  return msgs;
+}
+
+// Construit le system prompt en blocs cacheables. Le prompt de l'agent et le
+// contexte organisation+documents changent rarement (édition admin / upload doc)
+// -> cache_control 1h. footballCtx est calculé en temps réel à chaque question
+// -> ajouté après le dernier breakpoint, donc jamais mis en cache.
+function buildSystemBlocks(agentPrompt, orgName, docsCtx, footballCtx) {
+  const blocks = [
+    { type: 'text', text: agentPrompt, cache_control: { type: 'ephemeral', ttl: '1h' } },
+    { type: 'text', text: `\n\nOrganisation : ${orgName || ''}${docsCtx}`, cache_control: { type: 'ephemeral', ttl: '1h' } }
+  ];
+  if (footballCtx) blocks.push({ type: 'text', text: footballCtx });
+  return blocks;
+}
+
+async function authHeaders() {
+  const { data: { session } } = await sb.auth.getSession();
+  return session ? { Authorization: `Bearer ${session.access_token}` } : {};
+}
+
 async function callAPI(system, messages) {
   const res = await fetch(API_URL, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 4096, system, messages })
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 4096, system, messages: withCacheBreakpoint(messages) })
   });
   const data = await res.json();
   return data.content?.[0]?.text || '';
@@ -820,8 +855,8 @@ async function callAPIWithTools(system, messages, tools, orgId, executeTool) {
   let convo = [...messages];
   for (let i = 0; i < 5; i++) {
     const res = await fetch(API_URL, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 4096, system, messages: convo, tools })
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 4096, system, messages: withCacheBreakpoint(convo), tools })
     });
     const data = await res.json();
     const toolUseBlocks = (data.content || []).filter(b => b.type === 'tool_use');
@@ -859,7 +894,7 @@ async function extractTeamName(query) {
   // Utiliser Claude pour extraire le nom de l'équipe
   const res = await fetch('/api/chat', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: JSON.stringify({
       model: 'claude-sonnet-4-6',
       max_tokens: 50,
@@ -969,7 +1004,10 @@ async function sendChat() {
 
       // Le prompt de routage vient de l'agent Manager configuré pour cette organisation
       // (chaque org peut avoir son propre schéma JSON de sortie — urgence, multi-experts, etc.)
-      const routingReply = await callAPI(currentAgent.prompt, [{ role: 'user', content: text }]);
+      const routingReply = await callAPI(
+        [{ type: 'text', text: currentAgent.prompt, cache_control: { type: 'ephemeral', ttl: '1h' } }],
+        [{ role: 'user', content: text }]
+      );
       document.getElementById('thinking-row')?.remove();
 
       let targetAgents = [];
@@ -989,7 +1027,7 @@ async function sendChat() {
       let allReplies = [];
       for (const agent of targetAgents) {
         appendThinking(`${agent.icon} ${agent.name} analyse`);
-        const system = `${agent.prompt}\n\nOrganisation : ${currentOrg?.name||''}${docsCtx}${footballCtx}`;
+        const system = buildSystemBlocks(agent.prompt, currentOrg?.name, docsCtx, footballCtx);
         const isMaintenanceAgent = agent.name?.toLowerCase().includes('maintenance');
         const orgId = currentOrg?.id || currentProfile?.org_id;
         const reply = isMaintenanceAgent
@@ -1030,7 +1068,7 @@ Réponds en français, de façon structurée et concise.`;
     } else {
       // Agent unique direct
       appendThinking(currentAgent.icon + ' ' + currentAgent.name + ' analyse');
-      const system = `${currentAgent.prompt}\n\nOrganisation : ${currentOrg?.name||''}${docsCtx}${footballCtx}`;
+      const system = buildSystemBlocks(currentAgent.prompt, currentOrg?.name, docsCtx, footballCtx);
       const isMaintenanceAgent = currentAgent?.name?.toLowerCase().includes('maintenance');
       const orgId = currentOrg?.id || currentProfile?.org_id;
       const reply = isMaintenanceAgent
