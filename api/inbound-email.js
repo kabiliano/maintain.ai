@@ -67,13 +67,15 @@ function extractBody(content) {
 }
 
 // Les prompts "Patrimoine" produisent : Urgence / Responsabilité / --- / [email].
-// Seul ce qui suit le dernier séparateur "---" doit partir au destinataire —
-// le reste est une analyse interne destinée au gestionnaire, pas au client.
+// Seul ce qui suit le PREMIER séparateur "---" doit partir au destinataire —
+// le reste avant est l'analyse interne destinée au gestionnaire, pas au client.
+// (Le premier "---", pas le dernier : le corps de l'email lui-même peut
+// légitimement contenir d'autres "---" en markdown, ex. avant une signature —
+// couper au dernier jetterait alors toute la vraie réponse.)
 function extractEmailBody(agentResponse) {
   const lines = agentResponse.split('\n');
-  let lastSepIdx = -1;
-  lines.forEach((line, i) => { if (line.trim() === '---') lastSepIdx = i; });
-  const raw = lastSepIdx === -1 ? agentResponse : lines.slice(lastSepIdx + 1).join('\n');
+  const sepIdx = lines.findIndex((line) => line.trim() === '---');
+  const raw = sepIdx === -1 ? agentResponse : lines.slice(sepIdx + 1).join('\n');
   return raw.replace(/\*\*(.*?)\*\*/g, '$1').replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '$1').trim();
 }
 
@@ -163,6 +165,7 @@ export default async function handler(req, res) {
         ? `${targetSystem}\n\nOrganisation : ${org.name}`
         : [...targetSystem, { type: 'text', text: `\n\nOrganisation : ${org.name}` }];
       const rawReply = await callClaude(systemWithOrg, emailText);
+      console.log('raw agent reply (', targetAgent.name, '):', rawReply);
       draftReply = extractEmailBody(rawReply);
     }
 
