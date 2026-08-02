@@ -18,7 +18,7 @@ export default async function handler(req, res) {
 
   const [agent] = await sbAdmin(`agents?id=eq.${agent_id}&select=*`);
   if (!agent) return res.status(404).json({ error: 'Agent not found' });
-  if (!agent.org_id || agent.org_id !== profile.org_id) {
+  if (!agent.org_id || (agent.org_id !== profile.org_id && profile.role !== 'superadmin')) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   if (!agent.template_key) {

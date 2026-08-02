@@ -27,10 +27,13 @@ export default async function handler(req, res) {
   if (!agent) return res.status(404).json({ error: 'Agent not found' });
 
   // Global agents (org_id null) are shared across orgs; org-specific agents
-  // must belong to the caller's own organization.
-  if (agent.org_id && agent.org_id !== profile.org_id) {
+  // must belong to the caller's own organization — except superadmins, who
+  // can switch orgs client-side (org switcher) and legitimately chat with
+  // any org's agents, matching their existing broad access elsewhere in the app.
+  if (agent.org_id && agent.org_id !== profile.org_id && profile.role !== 'superadmin') {
     return res.status(403).json({ error: 'Forbidden' });
   }
+  const effectiveOrgId = agent.org_id || profile.org_id;
 
   let template = null;
   if (agent.template_key) {
@@ -53,8 +56,8 @@ export default async function handler(req, res) {
   // entirely in that case rather than appending an irrelevant block.
   if (typeof docsCtx === 'string' || typeof footballCtx === 'string') {
     let orgName = '';
-    if (profile.org_id) {
-      const [org] = await sbAdmin(`organizations?id=eq.${profile.org_id}&select=name`);
+    if (effectiveOrgId) {
+      const [org] = await sbAdmin(`organizations?id=eq.${effectiveOrgId}&select=name`);
       orgName = org?.name || '';
     }
     const safeDocsCtx = typeof docsCtx === 'string' ? docsCtx.slice(0, MAX_CONTEXT_LEN) : '';
