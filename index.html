@@ -409,7 +409,10 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
           <h3 id="org-form-title">Créer une organisation</h3>
           <div class="form-row">
             <div class="form-group"><label>NOM</label><input type="text" id="org-name" placeholder="Vinci Construction" /></div>
-            <div class="form-group"><label>PLAN</label><select id="org-plan"><option value="trial">Trial</option><option value="starter">Starter</option><option value="pro">Pro</option><option value="enterprise">Enterprise</option></select></div>
+            <div class="form-group"><label>PLAN</label><select id="org-plan">
+              <optgroup label="Essai"><option value="trial">Trial</option></optgroup>
+              <optgroup label="Plans payants"><option value="starter">Starter</option><option value="pro">Pro</option><option value="enterprise">Enterprise</option></optgroup>
+            </select></div>
           </div>
           <button class="btn-sm" id="org-form-submit" onclick="saveOrg()">Créer</button>
           <button class="btn-sm" id="org-form-cancel" style="display:none;" onclick="cancelEditOrg()">Annuler</button>
