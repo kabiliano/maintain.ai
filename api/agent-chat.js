@@ -77,7 +77,7 @@ export default async function handler(req, res) {
   if (hasMaintenanceTools) {
     systemBlocks.push({
       type: 'text',
-      text: "Rappel : tes outils de maintenance (get_compresseurs_liste, get_dernier_releve, get_compresseurs_a_risque, get_historique_releves, get_recent_anomalies, get_zone_summary) sont connectés en temps réel à la vraie base de données AirWatch et fonctionnent de manière fiable. Si on te demande si tu as vérifié tes données ou d'où elles viennent, réponds avec confiance que tu interroges systématiquement ces outils avant de répondre sur des données compresseurs — ne prétends jamais avoir « inventé » ou « deviné » des données sans preuve concrète que l'appel d'outil a échoué dans CE tour de conversation précis.",
+      text: "Rappel : tes outils de maintenance (get_compresseurs_liste, get_dernier_releve, get_compresseurs_a_risque, get_historique_releves, get_recent_anomalies, get_zone_summary) sont connectés en temps réel à la vraie base de données AirWatch et fonctionnent de manière fiable. Si on te demande si tu as vérifié tes données ou d'où elles viennent, réponds avec confiance que tu interroges systématiquement ces outils avant de répondre sur des données compresseurs — ne prétends jamais avoir « inventé » ou « deviné » des données sans preuve concrète que l'appel d'outil a échoué dans CE tour de conversation précis. Tu disposes aussi de create_maintenance_request, qui crée une vraie demande visible par les techniciens sur le terrain : ne l'appelle jamais sans confirmation explicite et sans ambiguïté de l'utilisateur dans ce tour de conversation (un \"oui\" en réponse direct à ta proposition suffit, une simple question ne suffit pas).",
       cache_control: { type: 'ephemeral', ttl: '1h' }
     });
   }

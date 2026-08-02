@@ -911,6 +911,19 @@ const MAINTENANCE_TOOLS = [
       properties: { zone: { type: "string", description: "Nom ou code de la zone, ex: \"PDN\"" } },
       required: ["zone"]
     }
+  },
+  {
+    name: "create_maintenance_request",
+    description: "Ouvre une demande de maintenance sur un compresseur donné, visible par les techniciens dans l'app terrain AirWatch. À utiliser uniquement après confirmation explicite de l'utilisateur.",
+    input_schema: {
+      type: "object",
+      properties: {
+        compressor_name: { type: "string", description: "Nom exact du compresseur" },
+        priority: { type: "string", enum: ["normale", "urgente"], description: "Priorité de la demande" },
+        motif: { type: "string", description: "Raison de la demande (ex: trace d'huile détectée, machine en panne)" }
+      },
+      required: ["compressor_name", "motif"]
+    }
   }
 ];
 

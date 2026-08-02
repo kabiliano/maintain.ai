@@ -107,6 +107,31 @@ async function getZoneSummary(orgId, zoneInput) {
   };
 }
 
+async function createMaintenanceRequest(orgId, compressorName, priority, motif) {
+  if (!compressorName) return { error: 'compressor_name requis' };
+  if (!motif) return { error: 'motif requis' };
+  const compressorId = await resolveCompressorId(orgId, compressorName);
+  if (!compressorId) return { error: `Compresseur "${compressorName}" introuvable` };
+  const safePriority = priority === 'urgente' ? 'urgente' : 'normale';
+
+  const res = await fetch(`${AIRWATCH_SUPABASE_URL}/rest/v1/maintenance_requests`, {
+    method: 'POST',
+    headers: {
+      apikey: process.env.AIRWATCH_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${process.env.AIRWATCH_SERVICE_ROLE_KEY}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation'
+    },
+    body: JSON.stringify({
+      org_id: orgId, compressor_id: compressorId, priority: safePriority,
+      motif, status: 'ouverte', created_by: 'Agent Maintenance (WRZ Ops)'
+    })
+  });
+  if (!res.ok) throw new Error(`Création demande échouée : ${res.status} ${await res.text()}`);
+  const [created] = await res.json();
+  return { success: true, id: created.id, compressor: compressorName, priority: safePriority, motif, status: 'ouverte' };
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
@@ -149,6 +174,9 @@ export default async function handler(req, res) {
         break;
       case 'get_zone_summary':
         result = await getZoneSummary(airwatchOrgId, input?.zone);
+        break;
+      case 'create_maintenance_request':
+        result = await createMaintenanceRequest(airwatchOrgId, input?.compressor_name, input?.priority, input?.motif);
         break;
       default:
         return res.status(400).json({ error: 'Tool inconnu: ' + tool_name });
