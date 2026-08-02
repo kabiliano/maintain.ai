@@ -434,6 +434,52 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
             <tbody></tbody>
           </table>
         </div>
+
+        <div class="card">
+          <h3>Personnaliser un agent</h3>
+          <p style="font-size:12px;color:var(--text2);font-family:var(--mono);margin-bottom:14px;">Ton, longueur, glossaire et règles d'escalade — le prompt système reste verrouillé.</p>
+          <div class="form-row">
+            <div class="form-group"><label>AGENT</label><select id="cfg-agent-select" onchange="onConfigAgentChange()"><option value="">— choisir —</option></select></div>
+          </div>
+          <div id="cfg-not-migrated" class="hidden" style="font-size:12px;color:var(--text2);font-family:var(--mono);">Cet agent n'est pas encore migré vers le système de personnalisation.</div>
+          <div id="cfg-agent-body" class="hidden">
+            <div class="form-row">
+              <div class="form-group"><label>TON</label><select id="cfg-tone">
+                <option value="formel">Formel</option><option value="neutre">Neutre</option><option value="decontracte">Décontracté</option>
+              </select></div>
+              <div class="form-group"><label>LONGUEUR</label><select id="cfg-length">
+                <option value="courte">Courte</option><option value="standard">Standard</option><option value="detaillee">Détaillée</option>
+              </select></div>
+            </div>
+
+            <label style="display:block;margin:14px 0 6px;font-size:11px;color:var(--text2);font-family:var(--mono);letter-spacing:0.08em;">GLOSSAIRE MÉTIER</label>
+            <div id="cfg-glossary-rows"></div>
+            <button class="btn-sm" onclick="addGlossaryRow()">+ Terme</button>
+
+            <label style="display:block;margin:14px 0 6px;font-size:11px;color:var(--text2);font-family:var(--mono);letter-spacing:0.08em;">RÈGLES D'ESCALADE</label>
+            <div id="cfg-escalation-rows"></div>
+            <button class="btn-sm" onclick="addEscalationRow()">+ Règle</button>
+
+            <label style="display:block;margin:14px 0 6px;font-size:11px;color:var(--text2);font-family:var(--mono);letter-spacing:0.08em;">CAS D'USAGE</label>
+            <div id="cfg-usecases" style="font-size:12px;color:var(--text2);font-family:var(--mono);margin-bottom:10px;">Aucun cas d'usage configuré pour ce template.</div>
+
+            <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="btn-sm" onclick="saveAgentDraft()">Enregistrer le brouillon</button>
+              <button class="btn-sm" onclick="toggleSandbox()">Tester</button>
+              <button class="btn-sm" style="background:rgba(0,224,160,0.2);" onclick="publishAgentConfig()">Publier</button>
+            </div>
+            <div id="cfg-status" style="font-size:11px;color:var(--text2);font-family:var(--mono);margin-top:8px;"></div>
+
+            <div id="cfg-sandbox" class="hidden" style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px;">
+              <p style="font-size:11px;color:var(--text2);font-family:var(--mono);margin-bottom:10px;">Test sur le brouillon — n'affecte pas les vrais utilisateurs.</p>
+              <div id="cfg-sandbox-msgs" style="max-height:280px;overflow-y:auto;margin-bottom:10px;display:flex;flex-direction:column;gap:10px;"></div>
+              <div class="form-row" style="grid-template-columns:1fr auto;">
+                <div class="form-group"><input type="text" id="cfg-sandbox-input" placeholder="Poser une question de test..." /></div>
+                <button class="btn-sm" style="align-self:end;height:36px;" onclick="sendSandboxMessage()">Envoyer</button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -661,7 +707,7 @@ async function loadAgents() {
   if (error) { console.error('loadAgents error', error); return; }
   agents = data || [];
   currentAgent = agents.find(a => a.is_default) || agents[0];
-  renderAgents(); updateAgentBar();
+  renderAgents(); updateAgentBar(); renderAgentConfigSelect();
 }
 
 function renderAgents() {
@@ -755,19 +801,6 @@ function withCacheBreakpoint(messages) {
   return msgs;
 }
 
-// Construit le system prompt en blocs cacheables. Le prompt de l'agent et le
-// contexte organisation+documents changent rarement (édition admin / upload doc)
-// -> cache_control 1h. footballCtx est calculé en temps réel à chaque question
-// -> ajouté après le dernier breakpoint, donc jamais mis en cache.
-function buildSystemBlocks(agentPrompt, orgName, docsCtx, footballCtx) {
-  const blocks = [
-    { type: 'text', text: agentPrompt, cache_control: { type: 'ephemeral', ttl: '1h' } },
-    { type: 'text', text: `\n\nOrganisation : ${orgName || ''}${docsCtx}`, cache_control: { type: 'ephemeral', ttl: '1h' } }
-  ];
-  if (footballCtx) blocks.push({ type: 'text', text: footballCtx });
-  return blocks;
-}
-
 async function authHeaders() {
   const { data: { session } } = await sb.auth.getSession();
   return session ? { Authorization: `Bearer ${session.access_token}` } : {};
@@ -780,6 +813,47 @@ async function callAPI(system, messages) {
   });
   const data = await res.json();
   return data.content?.[0]?.text || '';
+}
+
+// Le prompt système d'un agent n'est plus construit ni envoyé par le navigateur :
+// le serveur (/api/agent-chat) va chercher le template verrouillé + les
+// paramètres client en base et compose le prompt lui-même. On n'envoie que
+// l'identifiant de l'agent et le contexte non sensible (docs, foot).
+async function postAgentChat(agentId, messages, { docsCtx, footballCtx, tools, preview } = {}) {
+  const body = { agent_id: agentId, messages: withCacheBreakpoint(messages) };
+  if (docsCtx !== undefined) body.docsCtx = docsCtx;
+  if (footballCtx !== undefined) body.footballCtx = footballCtx;
+  if (tools) body.tools = tools;
+  if (preview) body.preview = true;
+  const res = await fetch('/api/agent-chat', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+    body: JSON.stringify(body)
+  });
+  return res.json();
+}
+
+async function callAgentAPI(agentId, messages, ctx) {
+  const data = await postAgentChat(agentId, messages, ctx);
+  return data.content?.[0]?.text || '';
+}
+
+async function callAgentAPIWithTools(agentId, messages, tools, orgId, executeTool, ctx) {
+  let convo = [...messages];
+  for (let i = 0; i < 5; i++) {
+    const data = await postAgentChat(agentId, convo, { ...ctx, tools });
+    const toolUseBlocks = (data.content || []).filter(b => b.type === 'tool_use');
+    if (!toolUseBlocks.length) {
+      return (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+    }
+    convo.push({ role: 'assistant', content: data.content });
+    const toolResults = [];
+    for (const block of toolUseBlocks) {
+      const result = await executeTool(block.name, block.input, orgId);
+      toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: JSON.stringify(result) });
+    }
+    convo.push({ role: 'user', content: toolResults });
+  }
+  return "Désolé, trop d'itérations pour répondre.";
 }
 
 // ── TOOLS MAINTENANCE (accès données Supabase temps réel) ──
@@ -850,29 +924,6 @@ async function executeMaintenanceTool(name, input, orgId) {
   } catch (e) {
     return { error: e.message };
   }
-}
-
-async function callAPIWithTools(system, messages, tools, orgId, executeTool) {
-  let convo = [...messages];
-  for (let i = 0; i < 5; i++) {
-    const res = await fetch(API_URL, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 4096, system, messages: withCacheBreakpoint(convo), tools })
-    });
-    const data = await res.json();
-    const toolUseBlocks = (data.content || []).filter(b => b.type === 'tool_use');
-    if (!toolUseBlocks.length) {
-      return (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
-    }
-    convo.push({ role: 'assistant', content: data.content });
-    const toolResults = [];
-    for (const block of toolUseBlocks) {
-      const result = await executeTool(block.name, block.input, orgId);
-      toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: JSON.stringify(result) });
-    }
-    convo.push({ role: 'user', content: toolResults });
-  }
-  return "Désolé, trop d'itérations pour répondre.";
 }
 
 // ── FOOTBALL API ──
@@ -1005,10 +1056,7 @@ async function sendChat() {
 
       // Le prompt de routage vient de l'agent Manager configuré pour cette organisation
       // (chaque org peut avoir son propre schéma JSON de sortie — urgence, multi-experts, etc.)
-      const routingReply = await callAPI(
-        [{ type: 'text', text: currentAgent.prompt, cache_control: { type: 'ephemeral', ttl: '1h' } }],
-        [{ role: 'user', content: text }]
-      );
+      const routingReply = await callAgentAPI(currentAgent.id, [{ role: 'user', content: text }]);
       document.getElementById('thinking-row')?.remove();
 
       let targetAgents = [];
@@ -1028,12 +1076,11 @@ async function sendChat() {
       let allReplies = [];
       for (const agent of targetAgents) {
         appendThinking(`${agent.icon} ${agent.name} analyse`);
-        const system = buildSystemBlocks(agent.prompt, currentOrg?.name, docsCtx, footballCtx);
         const isMaintenanceAgent = agent.name?.toLowerCase().includes('maintenance');
         const orgId = currentOrg?.id || currentProfile?.org_id;
         const reply = isMaintenanceAgent
-          ? await callAPIWithTools(system, convMessages, MAINTENANCE_TOOLS, orgId, executeMaintenanceTool)
-          : await callAPI(system, convMessages);
+          ? await callAgentAPIWithTools(agent.id, convMessages, MAINTENANCE_TOOLS, orgId, executeMaintenanceTool, { docsCtx, footballCtx })
+          : await callAgentAPI(agent.id, convMessages, { docsCtx, footballCtx });
         document.getElementById('thinking-row')?.remove();
         const srcMatch = reply.match(/\[Source:\s*([^\]]+)\]/);
         const cleanReply = reply.replace(/\[Source:[^\]]+\]/g,'').trim();
@@ -1069,12 +1116,11 @@ Réponds en français, de façon structurée et concise.`;
     } else {
       // Agent unique direct
       appendThinking(currentAgent.icon + ' ' + currentAgent.name + ' analyse');
-      const system = buildSystemBlocks(currentAgent.prompt, currentOrg?.name, docsCtx, footballCtx);
       const isMaintenanceAgent = currentAgent?.name?.toLowerCase().includes('maintenance');
       const orgId = currentOrg?.id || currentProfile?.org_id;
       const reply = isMaintenanceAgent
-        ? await callAPIWithTools(system, convMessages, MAINTENANCE_TOOLS, orgId, executeMaintenanceTool)
-        : await callAPI(system, convMessages);
+        ? await callAgentAPIWithTools(currentAgent.id, convMessages, MAINTENANCE_TOOLS, orgId, executeMaintenanceTool, { docsCtx, footballCtx })
+        : await callAgentAPI(currentAgent.id, convMessages, { docsCtx, footballCtx });
       document.getElementById('thinking-row')?.remove();
       const srcMatch = reply.match(/\[Source:\s*([^\]]+)\]/);
       const cleanReply = reply.replace(/\[Source:[^\]]+\]/g,'').trim();
@@ -1182,6 +1228,173 @@ async function loadAdminData() {
   const sel = document.getElementById('inv-org');
   if (sel) sel.innerHTML = allOrgs.map(o => `<option value="${o.id}">${o.name}</option>`).join('');
   renderOrgSwitcher();
+}
+
+// ── PERSONNALISATION AGENT (template verrouillé + paramètres client) ──
+let configAgent = null;
+let configTemplate = null;
+let cfgGlossary = [];
+let cfgEscalation = [];
+let sandboxMessages = [];
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderAgentConfigSelect() {
+  const sel = document.getElementById('cfg-agent-select');
+  if (!sel) return;
+  const orgId = currentOrg?.id || currentProfile?.org_id;
+  const ownAgents = agents.filter(a => a.org_id === orgId);
+  sel.innerHTML = '<option value="">— choisir —</option>' + ownAgents.map(a => `<option value="${a.id}">${escapeHtml(a.icon || '')} ${escapeHtml(a.name)}</option>`).join('');
+}
+
+async function onConfigAgentChange() {
+  const id = document.getElementById('cfg-agent-select').value;
+  sandboxMessages = [];
+  document.getElementById('cfg-sandbox-msgs').innerHTML = '';
+  document.getElementById('cfg-sandbox').classList.add('hidden');
+  document.getElementById('cfg-status').textContent = '';
+
+  if (!id) {
+    document.getElementById('cfg-agent-body').classList.add('hidden');
+    document.getElementById('cfg-not-migrated').classList.add('hidden');
+    configAgent = null; configTemplate = null;
+    return;
+  }
+
+  configAgent = agents.find(a => a.id === id);
+  if (!configAgent?.template_key) {
+    document.getElementById('cfg-agent-body').classList.add('hidden');
+    document.getElementById('cfg-not-migrated').classList.remove('hidden');
+    configTemplate = null;
+    return;
+  }
+  document.getElementById('cfg-not-migrated').classList.add('hidden');
+  document.getElementById('cfg-agent-body').classList.remove('hidden');
+
+  const { data } = await sb.from('agent_templates').select('*').eq('key', configAgent.template_key).single();
+  configTemplate = data || null;
+
+  const params = configAgent.draft_client_params || configAgent.client_params || {};
+  document.getElementById('cfg-tone').value = params.tone || 'neutre';
+  document.getElementById('cfg-length').value = params.response_length || 'standard';
+  cfgGlossary = Array.isArray(params.glossary) ? params.glossary.map(g => ({ ...g })) : [];
+  cfgEscalation = Array.isArray(params.escalation_rules) ? params.escalation_rules.map(r => ({ ...r })) : [];
+  renderGlossaryRows();
+  renderEscalationRows();
+  renderUseCases(params.enabled_use_cases || []);
+}
+
+function renderGlossaryRows() {
+  const el = document.getElementById('cfg-glossary-rows');
+  el.innerHTML = cfgGlossary.map((g, i) => `
+    <div class="form-row" style="grid-template-columns:1fr 2fr auto;align-items:end;">
+      <div class="form-group"><input type="text" placeholder="Terme" value="${escapeHtml(g.term)}" maxlength="60" oninput="cfgGlossary[${i}].term=this.value" /></div>
+      <div class="form-group"><input type="text" placeholder="Définition" value="${escapeHtml(g.definition)}" maxlength="200" oninput="cfgGlossary[${i}].definition=this.value" /></div>
+      <button class="btn-sm" style="background:rgba(255,77,77,0.1);color:var(--danger);border-color:rgba(255,77,77,0.3);" onclick="removeGlossaryRow(${i})">x</button>
+    </div>`).join('');
+}
+function addGlossaryRow() {
+  if (cfgGlossary.length >= 20) { toast('Maximum 20 termes', 'error'); return; }
+  cfgGlossary.push({ term: '', definition: '' });
+  renderGlossaryRows();
+}
+function removeGlossaryRow(i) { cfgGlossary.splice(i, 1); renderGlossaryRows(); }
+
+function renderEscalationRows() {
+  const el = document.getElementById('cfg-escalation-rows');
+  el.innerHTML = cfgEscalation.map((r, i) => `
+    <div class="form-row" style="grid-template-columns:1.3fr 1fr 1.3fr auto;align-items:end;">
+      <div class="form-group"><input type="text" placeholder="Mot-clé déclencheur" value="${escapeHtml(r.trigger)}" maxlength="80" oninput="cfgEscalation[${i}].trigger=this.value" /></div>
+      <div class="form-group"><select onchange="cfgEscalation[${i}].action=this.value">
+        <option value="mark_urgent" ${r.action === 'mark_urgent' ? 'selected' : ''}>Marquer urgent</option>
+        <option value="notify_email" ${r.action === 'notify_email' ? 'selected' : ''}>Notifier par email</option>
+        <option value="both" ${r.action === 'both' ? 'selected' : ''}>Les deux</option>
+      </select></div>
+      <div class="form-group"><input type="email" placeholder="email@org.com" value="${escapeHtml(r.notify_email || '')}" oninput="cfgEscalation[${i}].notify_email=this.value" /></div>
+      <button class="btn-sm" style="background:rgba(255,77,77,0.1);color:var(--danger);border-color:rgba(255,77,77,0.3);" onclick="removeEscalationRow(${i})">x</button>
+    </div>`).join('');
+}
+function addEscalationRow() {
+  if (cfgEscalation.length >= 10) { toast('Maximum 10 règles', 'error'); return; }
+  cfgEscalation.push({ trigger: '', action: 'mark_urgent', notify_email: '' });
+  renderEscalationRows();
+}
+function removeEscalationRow(i) { cfgEscalation.splice(i, 1); renderEscalationRows(); }
+
+function renderUseCases(enabledIds) {
+  const el = document.getElementById('cfg-usecases');
+  const useCases = configTemplate?.use_cases || [];
+  if (!useCases.length) { el.innerHTML = "Aucun cas d'usage configuré pour ce template."; return; }
+  const enabled = new Set(enabledIds);
+  el.innerHTML = useCases.map(uc => `
+    <label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:6px;">
+      <input type="checkbox" data-usecase="${escapeHtml(uc.id)}" ${enabled.has(uc.id) ? 'checked' : ''} /> ${escapeHtml(uc.label)}
+    </label>`).join('');
+}
+
+function collectClientParams() {
+  const enabled_use_cases = [...document.querySelectorAll('#cfg-usecases input[type=checkbox]:checked')].map(cb => cb.dataset.usecase);
+  return {
+    tone: document.getElementById('cfg-tone').value,
+    response_length: document.getElementById('cfg-length').value,
+    glossary: cfgGlossary,
+    escalation_rules: cfgEscalation,
+    enabled_use_cases
+  };
+}
+
+async function saveAgentDraft() {
+  if (!configAgent) return;
+  const res = await fetch('/api/agent-config', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+    body: JSON.stringify({ agent_id: configAgent.id, action: 'save_draft', client_params: collectClientParams() })
+  });
+  const result = await res.json();
+  if (!res.ok) { toast('Erreur : ' + (result.error || 'échec'), 'error'); return; }
+  configAgent.draft_client_params = result.draft_client_params;
+  document.getElementById('cfg-status').textContent = 'Brouillon enregistré à ' + new Date().toLocaleTimeString('fr-FR');
+  toast('Brouillon enregistré');
+}
+
+async function publishAgentConfig() {
+  if (!configAgent) return;
+  if (!confirm('Publier ce brouillon ? Les vrais utilisateurs et emails entrants verront immédiatement ce changement.')) return;
+  const res = await fetch('/api/agent-config', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+    body: JSON.stringify({ agent_id: configAgent.id, action: 'publish' })
+  });
+  const result = await res.json();
+  if (!res.ok) { toast('Erreur : ' + (result.error || 'échec'), 'error'); return; }
+  configAgent.client_params = result.client_params;
+  toast('Configuration publiée : ' + configAgent.name);
+  document.getElementById('cfg-status').textContent = 'Publié à ' + new Date().toLocaleTimeString('fr-FR');
+}
+
+function toggleSandbox() {
+  document.getElementById('cfg-sandbox').classList.toggle('hidden');
+}
+
+async function sendSandboxMessage() {
+  if (!configAgent) return;
+  const input = document.getElementById('cfg-sandbox-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  const msgsEl = document.getElementById('cfg-sandbox-msgs');
+  msgsEl.innerHTML += `<div class="msg-row user"><div class="msg-bubble">${escapeHtml(text)}</div></div>`;
+  sandboxMessages.push({ role: 'user', content: text });
+  msgsEl.scrollTop = msgsEl.scrollHeight;
+  try {
+    const data = await postAgentChat(configAgent.id, sandboxMessages, { preview: true });
+    const reply = data.content?.[0]?.text || '(pas de réponse)';
+    sandboxMessages.push({ role: 'assistant', content: reply });
+    msgsEl.innerHTML += `<div class="msg-row"><div class="msg-bubble">${escapeHtml(reply).replace(/\n/g,'<br>')}</div></div>`;
+    msgsEl.scrollTop = msgsEl.scrollHeight;
+  } catch (e) {
+    toast('Erreur sandbox : ' + e.message, 'error');
+  }
 }
 
 // ── INBOX (emails entrants) ──

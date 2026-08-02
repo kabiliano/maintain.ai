@@ -1,8 +1,7 @@
 import crypto from 'crypto';
+import { sbAdmin, composeAgentSystemPrompt } from './_lib/shared.js';
 
 export const config = { api: { bodyParser: false } };
-
-const SUPABASE_URL = 'https://cjlizuuaxucbpqykregv.supabase.co';
 
 async function getRawBody(req) {
   const chunks = [];
@@ -29,21 +28,6 @@ function verifySignature(rawBody, headers, secret) {
       return false;
     }
   });
-}
-
-async function sb(path, options = {}) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    ...options,
-    headers: {
-      apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-      Authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
-      'Content-Type': 'application/json',
-      Prefer: 'return=representation',
-      ...options.headers
-    }
-  });
-  if (!res.ok) throw new Error(`Supabase ${path} failed: ${res.status} ${await res.text()}`);
-  return res.json();
 }
 
 async function callClaude(system, userText) {
@@ -99,6 +83,19 @@ function parseFromHeader(from) {
   return { name: null, email: from.trim() };
 }
 
+// Legacy agents (no template_key) fall back to their raw `prompt` unchanged.
+// Migrated agents get their locked template + published client_params
+// composed server-side, same as api/agent-chat.js.
+async function resolveAgentSystem(agent) {
+  let template = null;
+  if (agent.template_key) {
+    const [t] = await sbAdmin(`agent_templates?key=eq.${encodeURIComponent(agent.template_key)}&select=*`);
+    template = t || null;
+  }
+  const { text, extraBlocks } = composeAgentSystemPrompt(agent, template);
+  return extraBlocks.length ? [{ type: 'text', text }, ...extraBlocks] : text;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
@@ -127,13 +124,13 @@ export default async function handler(req, res) {
     const body = extractBody(content);
     console.log('extracted body length:', body.length, 'preview:', body.slice(0, 200));
 
-    const [org] = await sb(`organizations?slug=eq.${encodeURIComponent(slug)}&select=id,name`);
+    const [org] = await sbAdmin(`organizations?slug=eq.${encodeURIComponent(slug)}&select=id,name`);
     if (!org) {
       console.error('No organization found for slug:', slug);
       return res.status(200).json({ ignored: true, reason: 'unknown_org_slug' });
     }
 
-    const agents = await sb(`agents?org_id=eq.${org.id}&select=name,description,prompt`);
+    const agents = await sbAdmin(`agents?org_id=eq.${org.id}&select=name,description,prompt,template_key,client_params`);
     const manager = agents.find((a) => a.name.toLowerCase().includes('manager'));
     const experts = agents.filter((a) => a !== manager);
 
@@ -145,7 +142,8 @@ export default async function handler(req, res) {
     let typeExpediteur = null;
 
     if (manager) {
-      const routingReply = await callClaude(manager.prompt, emailText);
+      const managerSystem = await resolveAgentSystem(manager);
+      const routingReply = await callClaude(managerSystem, emailText);
       try {
         const routing = JSON.parse(routingReply.replace(/```json|```/g, '').trim());
         const agentName = routing.agent || routing.agents?.[0];
@@ -160,14 +158,15 @@ export default async function handler(req, res) {
 
     let draftReply = '';
     if (targetAgent) {
-      const rawReply = await callClaude(
-        `${targetAgent.prompt}\n\nOrganisation : ${org.name}`,
-        emailText
-      );
+      const targetSystem = await resolveAgentSystem(targetAgent);
+      const systemWithOrg = typeof targetSystem === 'string'
+        ? `${targetSystem}\n\nOrganisation : ${org.name}`
+        : [...targetSystem, { type: 'text', text: `\n\nOrganisation : ${org.name}` }];
+      const rawReply = await callClaude(systemWithOrg, emailText);
       draftReply = extractEmailBody(rawReply);
     }
 
-    await sb('inbound_emails', {
+    await sbAdmin('inbound_emails', {
       method: 'POST',
       body: JSON.stringify({
         org_id: org.id,
