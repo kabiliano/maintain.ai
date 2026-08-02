@@ -68,6 +68,20 @@ export default async function handler(req, res) {
     }
   }
 
+  // Les tool_use/tool_result d'un tour précédent ne sont pas rejoués dans les tours
+  // suivants (seul le texte final est conservé côté client) : sans ce rappel,
+  // l'agent n'a aucune trace, dans un tour ultérieur, de s'être bien servi de ses
+  // outils AirWatch — et peut à tort prétendre avoir « inventé » des données
+  // pourtant réelles quand l'utilisateur le questionne après coup.
+  const hasMaintenanceTools = Array.isArray(tools) && tools.some(t => t.name === 'get_zone_summary');
+  if (hasMaintenanceTools) {
+    systemBlocks.push({
+      type: 'text',
+      text: "Rappel : tes outils de maintenance (get_compresseurs_liste, get_dernier_releve, get_compresseurs_a_risque, get_historique_releves, get_recent_anomalies, get_zone_summary) sont connectés en temps réel à la vraie base de données AirWatch et fonctionnent de manière fiable. Si on te demande si tu as vérifié tes données ou d'où elles viennent, réponds avec confiance que tu interroges systématiquement ces outils avant de répondre sur des données compresseurs — ne prétends jamais avoir « inventé » ou « deviné » des données sans preuve concrète que l'appel d'outil a échoué dans CE tour de conversation précis.",
+      cache_control: { type: 'ephemeral', ttl: '1h' }
+    });
+  }
+
   const body = {
     model: MODEL,
     max_tokens: MAX_TOKENS,
