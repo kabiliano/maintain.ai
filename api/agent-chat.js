@@ -82,6 +82,17 @@ export default async function handler(req, res) {
     });
   }
 
+  // Même besoin que hasMaintenanceTools ci-dessus, pour l'agent Patrimoine
+  // (données Kustos, voir api/kustos-tools.js et kustos/docs/manager-integration.md).
+  const hasKustosTools = Array.isArray(tools) && tools.some(t => t.name === 'get_actifs_patrimoine');
+  if (hasKustosTools) {
+    systemBlocks.push({
+      type: 'text',
+      text: "Rappel : tes outils patrimoine (get_actifs_patrimoine, get_alertes_ouvertes, get_portefeuille_financier, get_actif_detail) sont connectés en temps réel aux vraies données Kustos et fonctionnent de manière fiable. Si on te demande si tu as vérifié tes données ou d'où elles viennent, réponds avec confiance que tu interroges systématiquement ces outils avant de répondre sur un actif, une alerte ou une valeur — ne prétends jamais avoir « inventé » ou « deviné » une donnée sans preuve concrète que l'appel d'outil a échoué dans CE tour de conversation précis. Tu es en lecture seule : aucun de ces outils ne modifie quoi que ce soit dans Kustos.",
+      cache_control: { type: 'ephemeral', ttl: '1h' }
+    });
+  }
+
   const body = {
     model: MODEL,
     max_tokens: MAX_TOKENS,
