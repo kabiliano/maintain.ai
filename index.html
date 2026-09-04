@@ -942,6 +942,55 @@ async function executeMaintenanceTool(name, input) {
   }
 }
 
+// ── TOOLS PATRIMOINE (accès données Kustos, via /api/kustos-tools) ──
+// Kustos vit dans le même projet Supabase que WRZ Ops (schéma "kustos"),
+// mais ses tables sont verrouillées côté RLS sans policy client — comme pour
+// AirWatch, impossible d'interroger directement depuis le navigateur. Chaque
+// tool passe par l'endpoint serveur, qui détient la clé service_role.
+// Accès non filtré par organisation (Kustos est mono-utilisateur en V1, voir
+// kustos/docs/manager-integration.md) et lecture seule.
+const KUSTOS_TOOLS = [
+  {
+    name: "get_actifs_patrimoine",
+    description: "Liste tous les actifs de patrimoine physique suivis (montres, voitures de collection, immobilier) avec leur valeur actuelle et la date de leur dernier entretien/contrôle.",
+    input_schema: { type: "object", properties: {}, required: [] }
+  },
+  {
+    name: "get_alertes_ouvertes",
+    description: "Liste les alertes prédictives actuellement ouvertes (entretien à prévoir/en retard), triées par urgence.",
+    input_schema: { type: "object", properties: {}, required: [] }
+  },
+  {
+    name: "get_portefeuille_financier",
+    description: "Liste les actifs financiers suivis (crypto, actions) avec leur valeur actuelle en euros.",
+    input_schema: { type: "object", properties: {}, required: [] }
+  },
+  {
+    name: "get_actif_detail",
+    description: "Détail d'un actif de patrimoine physique précis (documents techniques, historique d'alertes) à partir de son nom.",
+    input_schema: {
+      type: "object",
+      properties: { asset_name: { type: "string", description: "Nom (ou partie du nom) de l'actif, ex: \"Nautilus\"" } },
+      required: ["asset_name"]
+    }
+  }
+];
+
+async function executeKustosTool(name, input) {
+  try {
+    const res = await fetch('/api/kustos-tools', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+      body: JSON.stringify({ tool_name: name, input })
+    });
+    const data = await res.json();
+    if (!res.ok) return { error: data.error || `Erreur ${res.status}` };
+    return data.result;
+  } catch (e) {
+    return { error: e.message };
+  }
+}
+
 // ── TOOLS BOÎTE MAIL (accès en lecture aux emails entrants, tous agents) ──
 const MAILBOX_TOOLS = [
   {
@@ -977,15 +1026,19 @@ async function executeMailboxTool(name, input, orgId) {
 }
 
 // Tous les agents ont accès à la boîte mail ; l'agent Maintenance a en plus
-// accès aux données compresseurs temps réel.
+// accès aux données compresseurs temps réel, l'agent Patrimoine aux données Kustos.
 function getAgentTools(agent) {
   const tools = [...MAILBOX_TOOLS];
   if (agent?.name?.toLowerCase().includes('maintenance')) tools.push(...MAINTENANCE_TOOLS);
+  if (agent?.name?.toLowerCase().includes('patrimoine')) tools.push(...KUSTOS_TOOLS);
   return tools;
 }
 
+const KUSTOS_TOOL_NAMES = new Set(KUSTOS_TOOLS.map(t => t.name));
+
 async function executeAgentTool(name, input, orgId) {
   if (name === 'get_recent_emails') return executeMailboxTool(name, input, orgId);
+  if (KUSTOS_TOOL_NAMES.has(name)) return executeKustosTool(name, input);
   return executeMaintenanceTool(name, input, orgId);
 }
 
